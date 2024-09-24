@@ -17,4 +17,5 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Check formatting
+      working-directory: authorization-registry
       run: cargo fmt --check

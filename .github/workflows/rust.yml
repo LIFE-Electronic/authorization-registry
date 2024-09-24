@@ -36,7 +36,9 @@ jobs:
     - uses: actions/checkout@v4
     - name: Build
       run: cargo build --verbose
+      working-directory: authorization-registry
     - name: Run tests
       run: cargo test --verbose
+      working-directory: authorization-registry
       env:
         DATABASE_URL: "postgres://postgres:postgres@localhost:5432/postgres"

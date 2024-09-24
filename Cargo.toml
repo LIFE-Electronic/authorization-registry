@@ -1,8 +1,0 @@
-[workspace]
-members = [
-  "ishare",
-  "authorization-registry",
-  "authorization-registry/ar_migration",
-  "authorization-registry/ar_entity"
-]
-resolver = "2"
