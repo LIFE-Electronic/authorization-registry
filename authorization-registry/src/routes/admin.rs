@@ -1,18 +1,22 @@
 use anyhow::Context;
 use axum::{
-    extract::{Query, State},
+    extract::{Path, Query, State},
     middleware::{from_fn, from_fn_with_state},
-    routing::post,
+    routing::{get, post},
     Extension, Json, Router,
 };
 use axum_extra::extract::WithRejection;
+use reqwest::StatusCode;
 use sea_orm::DatabaseConnection;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use uuid::Uuid;
 
-use crate::db::policy::{self as policy_store, MatchingPolicySetRow};
 use crate::services::policy as policy_service;
+use crate::{
+    db::policy::{self as policy_store, MatchingPolicySetRow},
+    error::ExpectedError,
+};
 use crate::{error::AppError, AppState};
 use crate::{
     middleware::{auth_role_middleware, extract_human_middleware, extract_role_middleware},
@@ -25,12 +29,30 @@ pub fn get_admin_routes(server_token: Arc<ServerToken>) -> Router<AppState> {
             "/policy-set",
             post(insert_policy_set).get(get_all_policy_sets),
         )
+        .route("/policy-set/:id", get(get_policy_set))
         .layer(from_fn_with_state(
             vec!["dexspace_admin".to_owned()],
             auth_role_middleware,
         ))
         .layer(from_fn(extract_human_middleware))
         .layer(from_fn_with_state(server_token, extract_role_middleware));
+}
+
+async fn get_policy_set(
+    Extension(db): Extension<DatabaseConnection>,
+    WithRejection(Path(id), _): WithRejection<Path<Uuid>, AppError>,
+) -> Result<Json<MatchingPolicySetRow>, AppError> {
+    let ps = policy_store::get_policy_set_with_policies(&id, &db).await?;
+
+    match ps {
+        Some(ps) => Ok(Json(ps)),
+        None => Err(AppError::Expected(ExpectedError {
+            status_code: StatusCode::NOT_FOUND,
+            message: "Can't find policy set".to_owned(),
+            reason: "Can't find policy set".to_owned(),
+            metadata: None,
+        })),
+    }
 }
 
 #[derive(Serialize)]

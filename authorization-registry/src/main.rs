@@ -3,6 +3,7 @@ use crate::services::ishare_provider::{ISHAREProvider, SatelliteProvider};
 use crate::services::server_token::ServerToken;
 
 use axum::async_trait;
+use axum::http::HeaderValue;
 use axum::Extension;
 use axum::{extract::FromRef, Router};
 use clap::Parser;
@@ -14,6 +15,7 @@ use routes::policy_set::get_policy_set_routes;
 use sea_orm::Database;
 use sea_orm::DatabaseConnection;
 use std::sync::Arc;
+use tower_http::cors::{AllowHeaders, AllowMethods, CorsLayer};
 use tower_http::trace::TraceLayer;
 
 mod config;
@@ -53,12 +55,17 @@ impl TimeProvider for RealTimeProvider {
     }
 }
 
+pub struct AppConfig {
+    pub deploy_route: String,
+}
+
 #[derive(Clone)]
 pub struct AppState {
     server_token: Arc<ServerToken>,
     satellite_provider: Arc<dyn SatelliteProvider>,
     time_provider: Arc<dyn TimeProvider>,
     de_expiry_seconds: i64,
+    config: Arc<AppConfig>,
 }
 
 impl FromRef<AppState> for Arc<ServerToken> {
@@ -68,6 +75,11 @@ impl FromRef<AppState> for Arc<ServerToken> {
 }
 
 pub fn get_app(db: DatabaseConnection, app_state: AppState) -> Router {
+    let cors = CorsLayer::new()
+        .allow_methods(AllowMethods::any())
+        .allow_origin("http://localhost:5173".parse::<HeaderValue>().unwrap())
+        .allow_headers(AllowHeaders::any());
+
     let connect_routes = get_connect_routes();
     let admin_routes = get_admin_routes(app_state.server_token.clone());
     let delegation_routes = get_delegation_routes(app_state.server_token.clone());
@@ -103,6 +115,7 @@ pub fn get_app(db: DatabaseConnection, app_state: AppState) -> Router {
             }),
         )
         .layer(Extension(db))
+        .layer(cors)
         .with_state(app_state);
 
     return app;
@@ -141,6 +154,9 @@ async fn main() {
         satellite_provider: Arc::new(sat_provider),
         time_provider: Arc::new(time_provider),
         de_expiry_seconds: config.de_expiry_seconds,
+        config: Arc::new(AppConfig {
+            deploy_route: config.deploy_route.clone(),
+        }),
     };
 
     let app = get_app(db, app_state);

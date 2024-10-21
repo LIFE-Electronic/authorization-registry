@@ -60,6 +60,9 @@ pub mod helpers {
             satellite_provider: Arc::new(sat_provider.clone()),
             time_provider: Arc::new(FakeTimeProvider::new()),
             de_expiry_seconds: 3600,
+            config: Arc::new(crate::AppConfig {
+                deploy_route: "".to_owned(),
+            }),
         };
         let app = get_app(db, app_state);
 

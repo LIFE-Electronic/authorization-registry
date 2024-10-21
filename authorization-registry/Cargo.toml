@@ -11,10 +11,10 @@ ar_migration = { path = "migration" }
 ar_entity = { path = "entity" }
 axum = "0.7.5"
 tokio = { version = "1.37.0", features = ['rt', 'rt-multi-thread'] } 
-tower-http = { version = "0.5.2", features = ["trace"] }
+tower-http = { version = "0.5.2", features = ["trace", "cors"] }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 tracing = "0.1.40"
-tower = "0.4.13"
+tower = { version = "0.4.13", features = ["util"] }
 jsonwebtoken = "9.3.0"
 serde = { version = "1.0.203", features = ["derive"] }
 sea-orm = { version = "0.12.15", features = ["macros", "sqlx-postgres", "runtime-tokio-native-tls"] }
@@ -28,5 +28,6 @@ sea-query = "0.30.7"
 axum-macros = "0.4.1"
 anyhow = { version = "1.0.86", features = ["backtrace"] }
 thiserror = "1.0.61"
-http-body-util = "0.1.2"
+http-body-util = "0.1.1"
 axum-extra = "0.9.3"
+urlencoding = "2.1.3"
