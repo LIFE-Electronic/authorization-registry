@@ -1,9 +1,7 @@
 use serde::Deserialize;
 
 fn default_listen_address() -> String {
-    "0.0.0.0:3
-    4000"
-        .to_string()
+    "0.0.0.0:4000".to_string()
 }
 
 fn default_jwt_expiry_seconds() -> u64 {
@@ -12,6 +10,10 @@ fn default_jwt_expiry_seconds() -> u64 {
 
 fn default_de_expiry_seconds() -> i64 {
     3600
+}
+
+fn default_deploy_route() -> String {
+    "/api".to_owned()
 }
 
 #[derive(Deserialize, Clone, Debug)]
@@ -32,6 +34,8 @@ pub struct Config {
     pub listen_address: String,
     #[serde(default = "default_de_expiry_seconds")]
     pub de_expiry_seconds: i64,
+    #[serde(default = "default_deploy_route")]
+    pub deploy_route: String,
 }
 
 pub fn read_config(path: String) -> Config {

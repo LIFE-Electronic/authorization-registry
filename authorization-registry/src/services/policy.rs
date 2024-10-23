@@ -1,4 +1,5 @@
 use anyhow::Context;
+use ar_entity::delegation_evidence::ResourceRule;
 use ishare::delegation_evidence::verify_delegation_evidence;
 use ishare::delegation_request::{DelegationRequest, DelegationTarget, ResourceTarget};
 use reqwest::StatusCode;
@@ -256,6 +257,18 @@ pub async fn add_policy_to_policy_set(
     time_provider: std::sync::Arc<dyn TimeProvider>,
     db: &DatabaseConnection,
 ) -> Result<ar_entity::policy::Model, AppError> {
+    match policy.rules.get(0) {
+        Some(ResourceRule::Permit) => {}
+        _ => {
+            return Err(AppError::Expected(ExpectedError {
+                status_code: StatusCode::BAD_REQUEST,
+                message: "First rule must have effect 'Permit'".to_owned(),
+                reason: "First rule must have effect 'Permit'".to_owned(),
+                metadata: None,
+            }))
+        }
+    }
+
     let policy_set = match policy_store::get_policy_set_by_id(&policy_set_id, &db)
         .await
         .context("Error getting policy set")?

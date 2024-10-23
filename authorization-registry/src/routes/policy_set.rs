@@ -599,6 +599,56 @@ mod test {
     }
 
     #[sqlx::test]
+    async fn test_add_policy_to_policy_set_no_first_effect_permit(
+        _pool_options: PgPoolOptions,
+        conn_option: PgConnectOptions,
+    ) -> sqlx::Result<()> {
+        let db = init_test_db(&conn_option).await;
+        insert_policy_set_fixture("./fixtures/policy_set1.json", &db).await;
+
+        let app = get_test_app(db);
+
+        let request_body = create_request_body(&json!({
+            "target": {
+                "resource": {
+                    "type": "test-iden2",
+                    "identifiers": ["test", "test-2"],
+                    "attributes": ["*"]
+                },
+                "actions": ["Read"],
+                "environment": {
+                    "serviceProviders": ["NL.EORI.LIFEELEC4DMI"]
+                }
+            },
+            "rules": [
+            ]
+        }));
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/policy-set/84b7fba4-05f3-4af8-9d84-dde384abe881/policy")
+                    .method("POST")
+                    .header(
+                        AUTHORIZATION,
+                        server_token::server_token_test_helper::get_human_token_header(
+                            Some("NL.24244".to_owned()),
+                            None,
+                        ),
+                    )
+                    .header("Content-Type", "application/json")
+                    .body(Body::new(request_body))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+        Ok(())
+    }
+
+    #[sqlx::test]
     async fn test_add_policy_to_policy_set_no_de(
         _pool_options: PgPoolOptions,
         conn_option: PgConnectOptions,

@@ -32,11 +32,11 @@ impl IdpConnector {
         }
     }
 
-    pub fn generate_auth_url(&self, client_assertion: &str, callback_uri: &str) -> String {
+    pub fn generate_auth_url(&self, client_assertion: &str, state: &str) -> String {
         let idp_url = self.idp_url.clone();
         let client_id = self.client_id.clone();
-
-        let url = format!("{idp_url}/protocol/openid-connect/auth?response_type=code&scope=openid+ishare&client_id={client_id}&request={client_assertion}&state={callback_uri}");
+        let encoded_state = urlencoding::encode(state);
+        let url = format!("{idp_url}/protocol/openid-connect/auth?response_type=code&scope=openid+ishare&client_id={client_id}&request={client_assertion}&state={encoded_state}");
 
         return url;
     }
@@ -86,11 +86,17 @@ impl IdpConnector {
             .header("Content-Type", "application/x-www-form-urlencoded")
             .send()
             .await
-            .context("Error fetching access token")?
+            .context("error fetching token")?;
+
+        if !response.status().is_success() {
+            anyhow::bail!("error response from idp: {:?}", response);
+        }
+
+        let token_response = response
             .json::<TokenResponse>()
             .await
-            .context("Error parsing response into 'TokenResponse'");
+            .context("Error decoding token response")?;
 
-        return response;
+        return Ok(token_response);
     }
 }
