@@ -15,9 +15,18 @@ type AuthContext = {
   getToken: () => string;
 };
 
+
+
+
+
+
+
+
+
+
 const tokenSchema = z.object({
   exp: z.number(),
-  company_id: z.string(),
+         company_id: z.string(),
   realm_access_roles: z.array(z.string()),
   user_id: z.string(),
 });
@@ -26,7 +35,7 @@ export type Token = z.infer<typeof tokenSchema>;
 
 export const authContext = createContext<AuthContext | null>(null);
 
-export function getTokenContent(token: string): Token {
+export function getTokenContent(token: string): number {
   const decoded = jose.decodeJwt(token);
   const result = tokenSchema.safeParse(decoded);
   if (result.success === false) {
