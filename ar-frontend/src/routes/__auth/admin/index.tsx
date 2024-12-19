@@ -66,7 +66,9 @@ function Component() {
         </Box>
         <Box>
           <Button
-            onClick={() => navigate({ to: "/admin/new_policy_set/step1" })}
+            onClick={() =>
+              navigate({ to: "/admin/new_policy_set/prefill_template" })
+            }
           >
             New policy set
           </Button>

@@ -6,7 +6,9 @@ import { useForm } from "@tanstack/react-form";
 import { FormField } from "@/components/form-field";
 import { required } from "@/form-field-validators";
 
-export const Route = createFileRoute("/__auth/member/new_policy_set/step1")({
+export const Route = createFileRoute(
+  "/__auth/member/new_policy_set/define_policy_set",
+)({
   component: Component,
 });
 
@@ -21,15 +23,13 @@ function Component() {
     },
     onSubmit: ({ value }) => {
       changeValue((oldValue) => ({ ...oldValue, ...value }));
-
-      // have to validate here
-      navigate({ to: "/member/new_policy_set/step2" });
+      navigate({ to: "/member/new_policy_set/add_policies" });
     },
   });
 
   return (
     <div>
-      <AddPolicySetStepper activeStep={1} />
+      <AddPolicySetStepper activeStep="Define policy set" />
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -65,7 +65,15 @@ function Component() {
               </FormField>
             )}
           />
-          <Stack direction="row">
+          <Stack direction="row" spacing={1}>
+            <Button
+              variant="outlined"
+              onClick={() =>
+                navigate({ to: "/member/new_policy_set/prefill_template" })
+              }
+            >
+              Back
+            </Button>
             <Button type="submit">Next step</Button>
           </Stack>
         </Stack>

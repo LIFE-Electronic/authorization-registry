@@ -1,50 +1,43 @@
 import { Stepper, Step, StepIndicator, Typography } from "@mui/joy";
+import { policySetTemplates } from "@/policy-set-templates";
 
-export function AddPolicySetStepper({ activeStep }: { activeStep: 1 | 2 | 3 }) {
+const steps = [
+  "Prefill from template",
+  "Define policy set",
+  "Add policies",
+  "Review and submit",
+] as const;
+
+export function AddPolicySetStepper({
+  activeStep,
+}: {
+  activeStep: (typeof steps)[keyof typeof steps];
+}) {
   return (
     <Stepper sx={{ width: "100%" }}>
-      <Step
-        indicator={
-          <StepIndicator
-            variant={activeStep === 1 ? "solid" : "outlined"}
-            color="neutral"
+      {steps
+        .filter(
+          (s) => policySetTemplates.length > 0 || s !== "Prefill from template",
+        )
+        .map((s, idx) => (
+          <Step
+            key={idx}
+            indicator={
+              <StepIndicator
+                variant={activeStep === s ? "solid" : "outlined"}
+                color="neutral"
+              >
+                {idx + 1}
+              </StepIndicator>
+            }
           >
-            1
-          </StepIndicator>
-        }
-      >
-        <Typography
-          textColor={activeStep === 1 ? "neutral.700" : "neutral.500"}
-        >
-          Define policy set
-        </Typography>
-      </Step>
-      <Step
-        indicator={
-          <StepIndicator variant={activeStep === 2 ? "solid" : "outlined"}>
-            2
-          </StepIndicator>
-        }
-      >
-        <Typography
-          textColor={activeStep === 2 ? "neutral.700" : "neutral.500"}
-        >
-          Add policies
-        </Typography>
-      </Step>
-      <Step
-        indicator={
-          <StepIndicator variant={activeStep === 3 ? "solid" : "outlined"}>
-            3
-          </StepIndicator>
-        }
-      >
-        <Typography
-          textColor={activeStep === 3 ? "neutral.700" : "neutral.500"}
-        >
-          Review and Submit
-        </Typography>
-      </Step>
+            <Typography
+              textColor={activeStep === s ? "neutral.700" : "neutral.500"}
+            >
+              {s}
+            </Typography>
+          </Step>
+        ))}
     </Stepper>
   );
 }

@@ -5,10 +5,15 @@ import { useCreatePolicySetContext } from "@/components/create-policy-set-contex
 import { useForm } from "@tanstack/react-form";
 import { FormField } from "@/components/form-field";
 import { required } from "@/form-field-validators";
+import { policySetTemplates } from "@/policy-set-templates";
 
-export const Route = createFileRoute("/__auth/admin/new_policy_set/step1")({
+export const Route = createFileRoute(
+  "/__auth/admin/new_policy_set/define_policy_set",
+)({
   component: Component,
 });
+
+console.log({ policySetTemplates });
 
 function Component() {
   const navigate = useNavigate();
@@ -23,13 +28,13 @@ function Component() {
       changeValue((oldValue) => ({ ...oldValue, ...value }));
 
       // have to validate here
-      navigate({ to: "/admin/new_policy_set/step2" });
+      navigate({ to: "/admin/new_policy_set/add_policies" });
     },
   });
 
   return (
     <div>
-      <AddPolicySetStepper activeStep={1} />
+      <AddPolicySetStepper activeStep="Define policy set" />
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -65,7 +70,18 @@ function Component() {
               </FormField>
             )}
           />
-          <Stack direction="row">
+          <Stack direction="row" spacing={1}>
+            {policySetTemplates.length > 0 && (
+              <Button
+                onClick={() =>
+                  navigate({ to: "/admin/new_policy_set/prefill_template" })
+                }
+                variant="outlined"
+                type="submit"
+              >
+                Back
+              </Button>
+            )}
             <Button type="submit">Next step</Button>
           </Stack>
         </Stack>

@@ -18,7 +18,7 @@ function Component() {
           <Button
             onClick={() =>
               navigate({
-                to: "/admin/new_policy_set/step2",
+                to: "/admin/new_policy_set/add_policies",
               })
             }
             variant="soft"

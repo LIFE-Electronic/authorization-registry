@@ -33,7 +33,9 @@ function Component() {
         <Box>
           <Button
             variant="plain"
-            onClick={() => navigate({ to: "/member/new_policy_set/step1" })}
+            onClick={() =>
+              navigate({ to: "/member/new_policy_set/prefill_template" })
+            }
           >
             New policy set
           </Button>

@@ -2,9 +2,12 @@ import { Stack, Typography, Box, Button, Divider, Alert } from "@mui/joy";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCreatePolicySetContext } from "@/components/create-policy-set-context";
 import { PolicyCard } from "@/components/policy-card";
-import { useCreatePolicySet } from "@/network/policy-set";
+import { useAdminCreatePolicySet } from "@/network/policy-set";
+import { AddPolicySetStepper } from "@/components/add-policy-set-stepper";
 
-export const Route = createFileRoute("/__auth/member/new_policy_set/step3")({
+export const Route = createFileRoute(
+  "/__auth/admin/new_policy_set/review_and_submit",
+)({
   component: Component,
 });
 
@@ -14,18 +17,18 @@ function Component() {
     mutateAsync: createPolicySet,
     isPending,
     error: submitError,
-  } = useCreatePolicySet();
+  } = useAdminCreatePolicySet();
   const { value } = useCreatePolicySetContext();
 
   function onBack() {
     navigate({
-      to: "/member/new_policy_set/step2",
+      to: "/admin/new_policy_set/add_policies",
     });
   }
 
   return (
     <Stack spacing={3}>
-      <Typography level="h3">Review policy set</Typography>
+      <AddPolicySetStepper activeStep="Review and submit" />
 
       {submitError && (
         <Box paddingTop={4}>
@@ -65,7 +68,7 @@ function Component() {
           onClick={() =>
             createPolicySet(value).then(() => {
               navigate({
-                to: "/member",
+                to: "/admin",
               });
             })
           }

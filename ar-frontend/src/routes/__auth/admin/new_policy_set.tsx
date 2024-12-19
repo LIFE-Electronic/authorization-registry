@@ -12,6 +12,7 @@ function Component() {
       <Typography paddingBottom={2} level="h2">
         New policy set
       </Typography>
+
       <Outlet />
     </CreatePolicySetContext>
   );

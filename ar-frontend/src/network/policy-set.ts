@@ -8,7 +8,7 @@ export type CreatePolicySet = {
   policies: Omit<Policy, "id">[];
 };
 
-const policySchema = z.object({
+export const policySchema = z.object({
   id: z.string(),
   actions: z.array(z.string()),
   identifiers: z.array(z.string()),

@@ -20,7 +20,7 @@ function Component() {
     }));
 
     navigate({
-      to: "/admin/new_policy_set/step2",
+      to: "/admin/new_policy_set/add_policies",
     });
   }
 
