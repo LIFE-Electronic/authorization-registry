@@ -26,7 +26,6 @@ function Component() {
       changeValue((oldValue) => ({ ...oldValue, ...value }));
 
       // have to validate here
-      console.log({ value });
       navigate({ to: "/admin/new_policy_set_template/add_policies" });
     },
   });

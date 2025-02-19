@@ -43,6 +43,18 @@ function Component() {
       >
         <Stack paddingTop={2} spacing={1}>
           <form.Field
+            name="policy_issuer"
+            validators={required}
+            children={(field) => (
+              <FormField label="Policy issuer" errors={field.state.meta.errors}>
+                <Input
+                  value={field.state.value}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+              </FormField>
+            )}
+          />
+          <form.Field
             name="access_subject"
             validators={required}
             children={(field) => (
@@ -57,30 +69,15 @@ function Component() {
               </FormField>
             )}
           />
-          <form.Field
-            name="policy_issuer"
-            validators={required}
-            children={(field) => (
-              <FormField label="Policy issuer" errors={field.state.meta.errors}>
-                <Input
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                />
-              </FormField>
-            )}
-          />
           <Stack direction="row" spacing={1}>
-            {
-              <Button
-                onClick={() =>
-                  navigate({ to: "/admin/new_policy_set/prefill_template" })
-                }
-                variant="outlined"
-                type="submit"
-              >
-                Back
-              </Button>
-            }
+            <Button
+              onClick={() => {
+                navigate({ to: "/admin/new_policy_set/prefill_template" });
+              }}
+              variant="outlined"
+            >
+              Back
+            </Button>
             <Button type="submit">Next step</Button>
           </Stack>
         </Stack>
