@@ -27,6 +27,15 @@ const theme = extendTheme({
     display: "Merriweather Sans Variable", // applies to `h1`–`h4`
     body: "Merriweather Sans Variable", // applies to `title-*` and `body-*`
   },
+  components: {
+    JoyChip: {
+      styleOverrides: {
+        label: () => ({
+          whiteSpace: "pre",
+        }),
+      },
+    },
+  },
 });
 
 function WrappedApp() {

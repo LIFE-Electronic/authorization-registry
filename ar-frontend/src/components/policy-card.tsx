@@ -1,6 +1,7 @@
 import { Box, Card, Typography, Stack } from "@mui/joy";
 import { Policy } from "../network/policy-set";
 import { ReactNode } from "react";
+import { arrayValueToDisplay } from "@/array-to-display";
 
 function PolicyCardItem({
   title,
@@ -19,7 +20,11 @@ function PolicyCardItem({
         </Typography>
       </Box>
       <Box display="grid" gridColumn={2} paddingLeft={2}>
-        <Typography textColor="primary.500" level="body-xs">
+        <Typography
+          whiteSpace="pre-wrap"
+          textColor="primary.500"
+          level="body-xs"
+        >
           {description}
         </Typography>
       </Box>
@@ -57,7 +62,7 @@ export function PolicyCard({
           <Box display="grid">
             <PolicyCardItem
               title="Actions"
-              description={policy.actions.join(", ")}
+              description={arrayValueToDisplay(policy.actions)}
             />
             <PolicyCardItem
               title="Resource type"
@@ -65,15 +70,15 @@ export function PolicyCard({
             />
             <PolicyCardItem
               title="Service providers"
-              description={policy.service_providers.join(", ")}
+              description={arrayValueToDisplay(policy.service_providers)}
             />
             <PolicyCardItem
               title="Attributes"
-              description={policy.attributes.join(", ")}
+              description={arrayValueToDisplay(policy.attributes)}
             />
             <PolicyCardItem
               title="Identifiers"
-              description={policy.identifiers.join(", ")}
+              description={arrayValueToDisplay(policy.identifiers)}
             />
             <Typography textColor="neutral.800" level="body-xs">
               Rules
@@ -100,15 +105,19 @@ export function PolicyCard({
                       <>
                         <PolicyCardItem
                           title="Identifiers"
-                          description={r.target.resource.identifiers.join(", ")}
+                          description={arrayValueToDisplay(
+                            r.target.resource.identifiers,
+                          )}
                         />
                         <PolicyCardItem
                           title="Attributes"
-                          description={r.target.resource.attributes.join(", ")}
+                          description={arrayValueToDisplay(
+                            r.target.resource.attributes,
+                          )}
                         />
                         <PolicyCardItem
                           title="Actions"
-                          description={r.target.actions.join(", ")}
+                          description={arrayValueToDisplay(r.target.actions)}
                         />
                         <PolicyCardItem
                           title="Resource type"

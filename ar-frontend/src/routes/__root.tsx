@@ -21,7 +21,7 @@ export const Route = createRootRoute({
           justifyContent: "center",
         }}
       >
-        <Box sx={{ maxWidth: 900, width: 900, paddingX: 1 }}>
+        <Box sx={{ maxWidth: 900, width: 900, paddingX: 1, paddingBottom: 2 }}>
           <Outlet />
         </Box>
       </Box>

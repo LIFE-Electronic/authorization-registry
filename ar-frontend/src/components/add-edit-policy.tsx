@@ -23,6 +23,7 @@ import { PolicyCard } from "./policy-card";
 import { Policy } from "@/network/policy-set";
 import { Fragment } from "react/jsx-runtime";
 import { ErrorResponse } from "@/network/fetch";
+import { arrayValueToDisplay } from "@/array-to-display";
 
 export type Step1FormFields = {
   actions: string[];
@@ -285,19 +286,25 @@ export function Step2({
           {value.rules.map((r, idx) =>
             r.effect === "Deny" ? (
               <Card key={idx}>
-                <Box display="flex" justifyContent="space-between">
+                <Box
+                  display="flex"
+                  justifyContent="space-between"
+                  sx={{ whiteSpace: "pre" }}
+                >
                   <Stack>
                     <Typography level="body-sm">
-                      Actions: {r.target.actions}
+                      Actions: {arrayValueToDisplay(r.target.actions)}
                     </Typography>
                     <Typography level="body-sm">
                       Resource type: {r.target.resource.type}
                     </Typography>
                     <Typography level="body-sm">
-                      Identifiers: {r.target.resource.identifiers}
+                      Identifiers:{" "}
+                      {arrayValueToDisplay(r.target.resource.identifiers)}
                     </Typography>
                     <Typography level="body-sm">
-                      Attributes: {r.target.resource.attributes}
+                      Attributes:{" "}
+                      {arrayValueToDisplay(r.target.resource.attributes)}
                     </Typography>
                   </Stack>
                   <Box>
