@@ -132,6 +132,7 @@ impl TimeProvider for RealTimeProvider {
 pub struct AppConfig {
     pub deploy_route: String,
     pub client_eori: String,
+    pub validate_m2m_certificate: bool,
 }
 
 #[derive(Clone)]
@@ -247,6 +248,7 @@ async fn main() {
         config: Arc::new(AppConfig {
             deploy_route: config.deploy_route.clone(),
             client_eori: config.client_eori.clone(),
+            validate_m2m_certificate: config.validate_m2m_certificate,
         }),
     };
 

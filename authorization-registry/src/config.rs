@@ -20,6 +20,10 @@ fn default_disable_cors_check() -> bool {
     true
 }
 
+fn default_validate_m2m_certificate() -> bool {
+    true
+}
+
 #[derive(Deserialize, Clone, Debug)]
 pub struct Config {
     pub client_eori: String,
@@ -43,6 +47,8 @@ pub struct Config {
     pub seed_folder: Option<String>,
     #[serde(default = "default_disable_cors_check")]
     pub disable_cors_check: bool,
+    #[serde(default = "default_validate_m2m_certificate")]
+    pub validate_m2m_certificate: bool,
 }
 
 pub fn read_config(path: String) -> Config {

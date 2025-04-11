@@ -134,7 +134,7 @@ async fn insert_policy_set_template(
         for sp in p.service_providers.iter() {
             app_state
                 .satellite_provider
-                .validate_party(sp)
+                .validate_party(app_state.time_provider.now(), sp)
                 .await
                 .map_err(|e| {
                     AppError::Expected(ExpectedError {
@@ -263,7 +263,7 @@ async fn add_policy_to_policy_set(
     for sp in body.target.environment.service_providers.iter() {
         app_state
             .satellite_provider
-            .validate_party(sp)
+            .validate_party(app_state.time_provider.now(), sp)
             .await
             .map_err(|e| {
                 AppError::Expected(ExpectedError {
@@ -337,7 +337,7 @@ async fn replace_policy_in_policy_set(
     for sp in body.target.environment.service_providers.iter() {
         app_state
             .satellite_provider
-            .validate_party(sp)
+            .validate_party(app_state.time_provider.now(), sp)
             .await
             .map_err(|e| {
                 AppError::Expected(ExpectedError {
@@ -536,6 +536,7 @@ async fn insert_policy_set(
     >,
 ) -> Result<Json<InsertPolicySetResponse>, AppError> {
     let policy_set_id = policy_service::insert_policy_set_with_policies_admin(
+        app_state.time_provider.now(),
         &body,
         &db,
         app_state.satellite_provider,

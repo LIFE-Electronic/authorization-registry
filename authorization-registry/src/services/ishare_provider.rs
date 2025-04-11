@@ -87,14 +87,20 @@ pub trait SatelliteProvider: Send + Sync {
 
     async fn handle_m2m_authentication(
         &self,
+        now: chrono::DateTime<chrono::Utc>,
         client_id: &str,
         grant_type: &str,
         client_assertion: &str,
         client_assertion_type: &str,
         scope: &str,
+        validate_certificate: bool,
     ) -> Result<String, AppError>;
 
-    async fn validate_party(&self, eori: &str) -> Result<PartyInfo, ValidatePartyError>;
+    async fn validate_party(
+        &self,
+        now: chrono::DateTime<chrono::Utc>,
+        eori: &str,
+    ) -> Result<PartyInfo, ValidatePartyError>;
 
     fn create_delegation_token(
         &self,
@@ -102,7 +108,20 @@ pub trait SatelliteProvider: Send + Sync {
         de_container: &DelegationEvidenceContainer,
     ) -> anyhow::Result<String>;
 
-    fn create_capabilities_token(&self, capabilities: &Capabilities) -> anyhow::Result<String>;
+    fn create_capabilities_token(
+        &self,
+        audience: &str,
+        capabilities: &Capabilities,
+    ) -> anyhow::Result<String>;
+
+    fn handle_previous_step_client_assertion(
+        &self,
+        now: chrono::DateTime<chrono::Utc>,
+        requestor_company_id: &str,
+        client_assertion: &str,
+        policy_issuer: &str,
+        access_subject: &str,
+    ) -> bool;
 }
 
 #[derive(Clone)]
@@ -136,13 +155,17 @@ impl SatelliteProvider for ISHAREProvider {
         de_container: &DelegationEvidenceContainer,
     ) -> anyhow::Result<String> {
         self.ishare
-            .create_client_assertion_with_extra_claims(Some(audience.to_owned()), de_container)
+            .create_client_assertion_with_extra_claims(audience.to_owned(), de_container)
             .context("Error creating delegation token")
     }
 
-    fn create_capabilities_token(&self, capabilities: &Capabilities) -> anyhow::Result<String> {
+    fn create_capabilities_token(
+        &self,
+        audience: &str,
+        capabilities: &Capabilities,
+    ) -> anyhow::Result<String> {
         self.ishare
-            .create_client_assertion_with_extra_claims(None, capabilities)
+            .create_client_assertion_with_extra_claims(audience.to_string(), capabilities)
             .context("Error creating delegation token")
     }
 
@@ -155,7 +178,7 @@ impl SatelliteProvider for ISHAREProvider {
 
             let client_assertion = self
                 .ishare
-                .create_client_assertion(Some(self.ishare.sattelite_eori.clone()))?;
+                .create_client_assertion(self.ishare.sattelite_eori.clone())?;
             let token_response = self
                 .ishare
                 .get_satelite_access_token(&client_assertion)
@@ -174,22 +197,26 @@ impl SatelliteProvider for ISHAREProvider {
         }
     }
 
-    async fn validate_party(&self, eori: &str) -> Result<PartyInfo, ValidatePartyError> {
+    async fn validate_party(
+        &self,
+        now: chrono::DateTime<chrono::Utc>,
+        eori: &str,
+    ) -> Result<PartyInfo, ValidatePartyError> {
         let token = self
             .get_satellite_token()
             .await
             .context("Error getting sattelite token")?;
 
-        let party_token = self
+        let party_info = self
             .ishare
-            .validate_party(eori, &token)
+            .validate_party(now, eori, &token)
             .await
             .context(format!(
                 "error validating company '{}' is ishare party",
                 eori
             ))?;
 
-        return Ok(party_token.claims.party_info);
+        return Ok(party_info);
     }
 
     fn handle_h2m_redirect_url_request(
@@ -203,7 +230,7 @@ impl SatelliteProvider for ISHAREProvider {
         let client_assertion = self
             .ishare
             .create_client_assertion_with_extra_claims(
-                Some(self.idp_connector.idp_eori.clone()),
+                self.idp_connector.idp_eori.clone(),
                 auth_claims,
             )
             .context("Error creating client assertion")?;
@@ -215,6 +242,49 @@ impl SatelliteProvider for ISHAREProvider {
         Ok(url)
     }
 
+    fn handle_previous_step_client_assertion(
+        &self,
+        now: chrono::DateTime<chrono::Utc>,
+        requestor_company_id: &str,
+        client_assertion: &str,
+        policy_issuer: &str,
+        access_subject: &str,
+    ) -> bool {
+        let policy_issuer_access = match self.ishare.decode_token(
+            now,
+            client_assertion,
+            policy_issuer,
+            Some(requestor_company_id),
+        ) {
+            Err(e) => {
+                tracing::info!("no acces for policy issuer via previous step: {}", e);
+                false
+            }
+            Ok(_) => {
+                tracing::info!("access granted for policy issuer via previous step");
+                true
+            }
+        };
+
+        let access_subject_access = match self.ishare.decode_token(
+            now,
+            client_assertion,
+            access_subject,
+            Some(requestor_company_id),
+        ) {
+            Err(e) => {
+                tracing::info!("no acces for access subject via previous step: {}", e);
+                false
+            }
+            Ok(_) => {
+                tracing::info!("access granted for access subject via previous step");
+                true
+            }
+        };
+
+        policy_issuer_access || access_subject_access
+    }
+
     async fn handle_h2m_auth_callback(
         &self,
         server_url: &str,
@@ -222,7 +292,7 @@ impl SatelliteProvider for ISHAREProvider {
     ) -> Result<(String, UserOption), AppError> {
         let client_assertion = self
             .ishare
-            .create_client_assertion(Some(self.idp_connector.idp_eori.clone()))
+            .create_client_assertion(self.idp_connector.idp_eori.clone())
             .context("Error creating client assertion")?;
 
         let response = self
@@ -273,11 +343,13 @@ impl SatelliteProvider for ISHAREProvider {
 
     async fn handle_m2m_authentication(
         &self,
+        now: chrono::DateTime<chrono::Utc>,
         client_id: &str,
         grant_type: &str,
         client_assertion: &str,
         client_assertion_type: &str,
         scope: &str,
+        validate_certificate: bool,
     ) -> Result<String, AppError> {
         tracing::info!(
             "handeling machine 2 machine authentication for client_id: {}",
@@ -296,60 +368,73 @@ impl SatelliteProvider for ISHAREProvider {
             _ => {}
         }
 
-        if !self
+        match self
             .ishare
             .validate_token(&client_assertion.to_string())
-            .context("Error validating client assertion")?
+            .context("Error validating client assertion")
         {
-            return Err(AppError::Expected(ExpectedError {
-                status_code: StatusCode::UNAUTHORIZED,
-                message: "client assertion is invalid".to_owned(),
-                reason: "invalid client assertion".to_owned(),
-                metadata: None,
-            }));
-        };
+            Ok(true) => {}
+            Ok(false) => {
+                return Err(AppError::Expected(ExpectedError {
+                    status_code: StatusCode::BAD_REQUEST,
+                    message: "client assertion is invalid".to_owned(),
+                    reason: "invalid client assertion".to_owned(),
+                    metadata: None,
+                }));
+            }
+            Err(e) => {
+                return Err(AppError::Expected(ExpectedError {
+                    status_code: StatusCode::BAD_REQUEST,
+                    message: "client assertion is invalid".to_owned(),
+                    reason: format!("error while validating client assertion: {}", e),
+                    metadata: None,
+                }));
+            }
+        }
 
         // probably need to be more explicit here in case the token has expired etc
-        let client_assertion_token = self.ishare.decode_token(&client_assertion).map_err(|e| {
-            return AppError::Expected(ExpectedError {
-                status_code: StatusCode::UNAUTHORIZED,
-                message: "client assertion is invalid".to_owned(),
-                reason: format!("{:?}", e),
-                metadata: None,
-            });
-        })?;
+        let client_assertion_token = self
+            .ishare
+            .decode_token(now, &client_assertion, client_id, None)
+            .map_err(|e| {
+                return AppError::Expected(ExpectedError {
+                    status_code: StatusCode::BAD_REQUEST,
+                    message: "client assertion is invalid".to_owned(),
+                    reason: format!("{:?}", e),
+                    metadata: None,
+                });
+            })?;
 
         let token = self.get_satellite_token().await?;
 
-        let party_token = self
+        let party_info = self
             .ishare
-            .validate_party(&client_id.to_string(), &token)
+            .validate_party(now, &client_id.to_string(), &token)
             .await
             .context(format!("error validating ishare party '{}'", &client_id))?;
 
-        if !self
-            .ishare
-            .validate_party_certificate(&client_assertion_token, &party_token)
-            .context(format!(
-                "Error validating party certificate for ishare party: '{}'",
-                &client_id
-            ))?
-        {
-            return Err(AppError::Expected(ExpectedError {
-                status_code: StatusCode::UNAUTHORIZED,
-                message: "x5c header does not match any of the certificates from parties endpoint at the iSHARE satelite".to_owned(),
-                  reason: "The client assertion x5c does not match any of the valid tokens from /parties".to_owned(),
-                  metadata: None
-            }));
+        if validate_certificate {
+            if !self
+                .ishare
+                .validate_party_certificate(&client_assertion_token, &party_info)
+                .context(format!(
+                    "Error validating party certificate for ishare party: '{}'",
+                    &client_id
+                ))?
+            {
+                return Err(AppError::Expected(ExpectedError {
+                    status_code: StatusCode::UNAUTHORIZED,
+                    message: "x5c header does not match any of the certificates from parties endpoint at the iSHARE satelite".to_owned(),
+                    reason: "The client assertion x5c does not match any of the valid tokens from /parties".to_owned(),
+                    metadata: None
+                }));
+            }
         }
 
-        let company_id = company_store::insert_if_not_exists(
-            &client_id,
-            &party_token.claims.party_info.party_name,
-            &self.db,
-        )
-        .await
-        .context("Error inserting company into db")?;
+        let company_id =
+            company_store::insert_if_not_exists(&client_id, &party_info.party_name, &self.db)
+                .await
+                .context("Error inserting company into db")?;
 
         return Ok(company_id);
     }
