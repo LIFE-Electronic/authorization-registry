@@ -1,3 +1,4 @@
+use axum::extract::rejection::FormRejection;
 use axum::extract::rejection::JsonRejection;
 use axum::extract::rejection::PathRejection;
 use axum::http::StatusCode;
@@ -38,11 +39,25 @@ pub enum AppError {
     JsonExtractorRejection(#[from] JsonRejection),
     #[error(transparent)]
     PathExtractorRejection(#[from] PathRejection),
+    #[error(transparent)]
+    FormExtractorRejection(#[from] FormRejection),
 }
 
 impl IntoResponse for AppError {
     fn into_response(self) -> axum::response::Response {
         match self {
+            AppError::FormExtractorRejection(form_rejection) => {
+                let message = form_rejection.body_text();
+                tracing::error!("Error extracting path from request: '{}'", message);
+
+                let response = ErrorResponse {
+                    error: message,
+                    metadata: None,
+                };
+
+                (StatusCode::BAD_REQUEST, Json(response)).into_response()
+            }
+
             AppError::PathExtractorRejection(path_rejection) => {
                 let message = path_rejection.body_text();
                 tracing::error!("Error extracting path from request: '{}'", message);
@@ -52,7 +67,7 @@ impl IntoResponse for AppError {
                     metadata: None,
                 };
 
-                (path_rejection.status(), Json(response)).into_response()
+                (StatusCode::BAD_REQUEST, Json(response)).into_response()
             }
             AppError::JsonExtractorRejection(json_rejection) => {
                 let message = json_rejection.body_text();
@@ -63,7 +78,7 @@ impl IntoResponse for AppError {
                     metadata: None,
                 };
 
-                (json_rejection.status(), Json(response)).into_response()
+                (StatusCode::BAD_REQUEST, Json(response)).into_response()
             }
             AppError::Expected(error) => {
                 tracing::info!("{:?}", error);

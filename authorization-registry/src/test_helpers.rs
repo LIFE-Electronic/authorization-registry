@@ -63,6 +63,8 @@ pub mod helpers {
             config: Arc::new(crate::AppConfig {
                 deploy_route: "".to_owned(),
                 client_eori: "NL.CONSUME_TOO_MUCH".to_owned(),
+                validate_m2m_certificate: true,
+                delegation_allows_service_providers: false,
             }),
         };
         let app = get_app(db, app_state, true);
@@ -79,6 +81,17 @@ pub mod helpers {
             return Ok("token".to_string());
         }
 
+        fn handle_previous_step_client_assertion(
+            &self,
+            _now: chrono::DateTime<chrono::Utc>,
+            _requestor_company_id: &str,
+            _client_assertion: &str,
+            _policy_issuer: &str,
+            _access_subject: &str,
+        ) -> bool {
+            true
+        }
+
         fn create_delegation_token(
             &self,
             _audience: &str,
@@ -87,14 +100,24 @@ pub mod helpers {
             Ok("delegation token".to_owned())
         }
 
-        fn create_capabilities_token(&self, _cap: &Capabilities) -> anyhow::Result<String> {
+        fn create_capabilities_token(
+            &self,
+            _aud: &str,
+            _cap: &Capabilities,
+        ) -> anyhow::Result<String> {
             Ok("capabilities token".to_owned())
         }
 
-        async fn validate_party(&self, eori: &str) -> Result<PartyInfo, ValidatePartyError> {
+        async fn validate_party(
+            &self,
+            _now: chrono::DateTime<chrono::Utc>,
+            eori: &str,
+        ) -> Result<PartyInfo, ValidatePartyError> {
             return Ok(PartyInfo {
+                capability_url: "capabilities".to_owned(),
                 adherence: Adherence {
                     status: "Active".to_string(),
+                    end_date: "2026-03-25T00:00:00.000Z".to_string(),
                 },
                 party_id: eori.to_string(),
                 party_name: "cool party".to_string(),
@@ -131,11 +154,13 @@ pub mod helpers {
 
         async fn handle_m2m_authentication(
             &self,
+            _now: chrono::DateTime<chrono::Utc>,
             _client_id: &str,
             _grant_type: &str,
             _client_assertion: &str,
             _client_assertion_type: &str,
             _scope: &str,
+            _validate_certificate: bool,
         ) -> Result<String, AppError> {
             return Ok("A_company".to_string());
         }

@@ -245,6 +245,7 @@ async fn replace_policy_in_policy_set(
     Json(body): Json<Policy>,
 ) -> Result<Json<ar_entity::policy::Model>, AppError> {
     let policy = policy_service::replace_policy_in_policy_set(
+        app_state.time_provider.now(),
         &role.get_company_id(),
         policy_set_id,
         policy_id,
@@ -317,6 +318,7 @@ async fn add_policy_to_policy_set(
     Json(body): Json<Policy>,
 ) -> Result<Json<ar_entity::policy::Model>, AppError> {
     let policy = policy_service::add_policy_to_policy_set(
+        app_state.time_provider.now(),
         &role.get_company_id(),
         &id,
         body,
@@ -439,6 +441,7 @@ async fn insert_policy_set(
     >,
 ) -> Result<Json<InsertPolicySetResponse>, AppError> {
     let policy_set_id = policy_service::insert_policy_set_with_policies(
+        app_state.time_provider.now(),
         &role.get_company_id(),
         &body,
         &db,
