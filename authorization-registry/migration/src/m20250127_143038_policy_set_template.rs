@@ -4,7 +4,7 @@ use sea_orm_migration::prelude::*;
 pub struct Migration;
 
 #[derive(DeriveIden)]
-enum PolicySetTemplate {
+pub enum PolicySetTemplate {
     Table,
     Id,
     Name,
@@ -30,7 +30,11 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(PolicySetTemplate::AccessSubject).text())
                     .col(ColumnDef::new(PolicySetTemplate::PolicyIssuer).text())
                     .col(ColumnDef::new(PolicySetTemplate::Name).text().not_null())
-                    .col(ColumnDef::new(PolicySetTemplate::Policies).json().not_null())
+                    .col(
+                        ColumnDef::new(PolicySetTemplate::Policies)
+                            .json()
+                            .not_null(),
+                    )
                     .to_owned(),
             )
             .await

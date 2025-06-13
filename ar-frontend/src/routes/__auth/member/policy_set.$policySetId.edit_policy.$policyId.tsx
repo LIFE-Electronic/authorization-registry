@@ -1,8 +1,21 @@
-import { AddEditPolicyContext } from "@/components/add-edit-policy-context";
-import { useAdminGetPolicy } from "@/network/policy-set";
+import { ModalHeader } from "@/components/modal-header";
+import { PolicyForm } from "@/components/policy-form";
+import {
+  Policy,
+  usePolicySet,
+  useReplacePolicyToPolicySet,
+} from "@/network/policy-set";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import { Typography, Stack, Button, Box } from "@mui/joy";
-import { createFileRoute, Outlet, useNavigate } from "@tanstack/react-router";
+import {
+  Stack,
+  Button,
+  Box,
+  Modal,
+  ModalOverflow,
+  ModalDialog,
+  Alert,
+} from "@mui/joy";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 
 export const Route = createFileRoute(
   "/__auth/member/policy_set/$policySetId/edit_policy/$policyId",
@@ -13,38 +26,80 @@ export const Route = createFileRoute(
 function Component() {
   const params = Route.useParams();
   const navigate = useNavigate();
-  const { data: policy, isLoading } = useAdminGetPolicy({
+
+  const {
+    mutateAsync: replacePolicy,
+    isPending,
+    error,
+  } = useReplacePolicyToPolicySet({
     policyId: params.policyId,
     policySetId: params.policySetId,
   });
+
+  function onSubmit(policy: Omit<Policy, "id">) {
+    replacePolicy({ policy }).then(() => {
+      navigate({
+        to: "/member/policy_set/$policySetId",
+        params: {
+          policySetId: params.policySetId,
+        },
+      });
+    });
+  }
+
+  const { data: policySet, isLoading } = usePolicySet({
+    policySetId: params.policySetId,
+  });
+
+  const policy = policySet?.policies.find(({ id }) => id === params.policyId);
 
   if (!policy || isLoading) {
     return <div />;
   }
 
   return (
-    <AddEditPolicyContext initialValue={policy}>
-      <Stack spacing={1}>
-        <Box>
-          <Button
-            startDecorator={<ArrowBackIcon />}
-            variant="soft"
-            onClick={() =>
-              navigate({
-                to: "/member/policy_set/$policySetId",
-                params,
-              })
-            }
-          >
-            Back to policy set
-          </Button>
-        </Box>
-        <Typography paddingBottom={2} level="h2">
-          Edit policy
-        </Typography>
-      </Stack>
+    <Modal open={true} onClose={() => navigate({ to: "/admin" })}>
+      <ModalOverflow>
+        <ModalDialog sx={{ padding: 0 }} size="lg" minWidth={900}>
+          <Stack direction="column" spacing={1}>
+            <ModalHeader caption="edit" title="Edit policy in policy set" />
 
-      <Outlet />
-    </AddEditPolicyContext>
+            <Box padding={2}>
+              {error && (
+                <Box paddingBottom={2}>
+                  <Alert color="danger">
+                    <Box>{error.message}</Box>
+                  </Alert>
+                </Box>
+              )}
+              <PolicyForm
+                initialValues={{
+                  ...policy,
+                  rules: policy.rules.filter(({ effect }) => effect === "Deny"),
+                }}
+                isSubmitPending={isPending}
+                submitText="Edit policy"
+                onSubmit={onSubmit}
+                backButton={
+                  <Button
+                    startDecorator={<ArrowBackIcon />}
+                    variant="plain"
+                    color="neutral"
+                    onClick={() =>
+                      navigate({
+                        to: "/member/policy_set/$policySetId",
+                        params,
+                      })
+                    }
+                  >
+                    Back to policy set
+                  </Button>
+                }
+              />
+            </Box>
+          </Stack>
+        </ModalDialog>
+      </ModalOverflow>
+    </Modal>
   );
 }

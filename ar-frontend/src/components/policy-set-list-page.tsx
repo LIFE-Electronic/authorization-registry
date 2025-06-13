@@ -1,6 +1,7 @@
-import { Card, Box, Typography, Stack } from "@mui/joy";
+import { Card, Box, Stack } from "@mui/joy";
 import { PolicyCard } from "./policy-card";
 import { PolicySetWithPolicies } from "@/network/policy-set";
+import { Caption, Subtitle2 } from "./extra-typography";
 
 export function PolicySetCard({
   policySet,
@@ -8,19 +9,18 @@ export function PolicySetCard({
   policySet: PolicySetWithPolicies;
 }) {
   return (
-    <Card>
+    <Card sx={{ width: "100%", boxSizing: "border-box" }}>
       <Stack direction="row" spacing={2}>
         <Box>
-          <Typography level="title-sm">Policy issuer</Typography>
-          <Typography level="body-xs">{policySet.policy_issuer}</Typography>
+          <Caption>Policy issuer</Caption>
+          <Subtitle2>{policySet.policy_issuer}</Subtitle2>
         </Box>
         <Box>
-          <Typography level="title-sm">Access subject</Typography>
-          <Typography level="body-xs">{policySet.access_subject}</Typography>
+          <Caption>Access subject</Caption>
+          <Subtitle2>{policySet.access_subject}</Subtitle2>
         </Box>
       </Stack>
       <Box>
-        <Typography>Policies</Typography>
         <Stack spacing={2} direction="row" flexWrap="wrap" useFlexGap>
           {policySet.policies.map((p) => (
             <Box
@@ -31,6 +31,7 @@ export function PolicySetCard({
                 md: "32%",
               }}
               height="100%"
+              display="flex"
             >
               <PolicyCard policy={p} />
             </Box>

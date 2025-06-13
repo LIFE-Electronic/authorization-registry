@@ -1,11 +1,10 @@
-import { Typography, Box } from "@mui/joy";
-import { LogoZwart } from "./logo-zwart";
+import { LogoPurple } from "./logo-purple";
 
-export function Logo({ admin }: { admin: boolean }) {
+export function Logo() {
   return (
-    <Box>
-      <LogoZwart />
-
+    <>
+      <LogoPurple />
+      {/* 
       <Typography
         textColor="neutral.600"
         fontSize={10}
@@ -13,7 +12,7 @@ export function Logo({ admin }: { admin: boolean }) {
         letterSpacing="-0.5px"
       >
         Authorization registry {admin ? " (admin)" : ""}
-      </Typography>
-    </Box>
+      </Typography> */}
+    </>
   );
 }

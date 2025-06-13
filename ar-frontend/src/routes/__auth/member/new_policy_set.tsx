@@ -1,5 +1,4 @@
 import { createFileRoute, Outlet } from "@tanstack/react-router";
-import { Typography } from "@mui/joy";
 import { CreatePolicySetContext } from "@/components/create-policy-set-context";
 
 export const Route = createFileRoute("/__auth/member/new_policy_set")({
@@ -9,9 +8,6 @@ export const Route = createFileRoute("/__auth/member/new_policy_set")({
 function Component() {
   return (
     <CreatePolicySetContext>
-      <Typography paddingBottom={2} level="h2">
-        New policy set
-      </Typography>
       <Outlet />
     </CreatePolicySetContext>
   );

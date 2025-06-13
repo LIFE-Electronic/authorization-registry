@@ -6,8 +6,9 @@ import { baseAPIUrl, ErrorResponse, useAuthenticatedFetch } from "./fetch";
 const policySetTemplateSchema = z.object({
   name: z.string(),
   policies: z.array(policySchema.omit({ id: true })),
-  access_subject: z.string().optional(),
-  policy_issuer: z.string().optional(),
+  access_subject: z.string().optional().nullable(),
+  policy_issuer: z.string().optional().nullable(),
+  description: z.string().optional().nullable(),
   id: z.string(),
 });
 
@@ -34,6 +35,7 @@ export function usePolicySetTemplates() {
 
 export type CreatePolicySetTemplate = {
   name: string;
+  description: string;
   policies: Omit<Policy, "id">[];
   access_subject?: string;
   policy_issuer?: string;

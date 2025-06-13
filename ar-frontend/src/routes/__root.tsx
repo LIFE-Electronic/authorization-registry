@@ -1,6 +1,7 @@
 import { Outlet, createRootRoute } from "@tanstack/react-router";
 import { Box } from "@mui/joy";
 import { z } from "zod";
+import backgroundImage from "../assets/background.png";
 
 const searchSchema = z
   .object({
@@ -14,16 +15,14 @@ export const Route = createRootRoute({
     return (
       <Box
         sx={{
-          backgroundImage:
-            "linear-gradient(to right bottom, #efe3eb, #fefefe, #fefefe, #efe3eb)",
+          backgroundColor: "#f4f5f6",
           minHeight: "100vh",
-          display: "flex",
-          justifyContent: "center",
+          backgroundImage: `url(${backgroundImage})`,
+          backgroundPosition: "top 200px left 0px",
+          backgroundRepeat: "repeat-x",
         }}
       >
-        <Box sx={{ maxWidth: 900, width: 900, paddingX: 1, paddingBottom: 2 }}>
-          <Outlet />
-        </Box>
+        <Outlet />
       </Box>
     );
   },

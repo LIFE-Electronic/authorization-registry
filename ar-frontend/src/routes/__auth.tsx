@@ -21,11 +21,11 @@ function Component() {
   const { token, setToken } = useAuth();
 
   useEffect(() => {
-    if (search?.token && isAuthenticated(token) && token) {
+    if (isAuthenticated(token) && token) {
       const tokenContent = getTokenContent(token);
       navigate({
         to: tokenContent.realm_access_roles.includes("dexspace_admin")
-          ? "/admin"
+          ? "/admin/policy_set"
           : "/member",
         replace: true,
         search: {

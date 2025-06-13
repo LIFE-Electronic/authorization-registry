@@ -32,6 +32,7 @@ pub struct InsertPolicySetTemplate {
     access_subject: Option<String>,
     policy_issuer: Option<String>,
     name: String,
+    description: Option<String>
 }
 
 pub async fn insert_policy_set_template(
@@ -44,6 +45,7 @@ pub async fn insert_policy_set_template(
         policy_issuer: sea_orm::ActiveValue::Set(new_ps_template.policy_issuer),
         policies: sea_orm::ActiveValue::Set(new_ps_template.policies),
         name: sea_orm::ActiveValue::Set(new_ps_template.name),
+        description: sea_orm::ActiveValue::Set(new_ps_template.description),
     };
 
     let inserted_id = ar_entity::policy_set_template::Entity::insert(to_insert)

@@ -18,6 +18,8 @@ pub struct Model {
     pub name: String,
     #[sea_orm(column_type = "Json")]
     pub policies: Vec<Policy>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub description: Option<String>,
 }
 
 #[derive(Deserialize, Clone, Debug, Serialize, FromJsonQueryResult, Eq, PartialEq, ToSchema)]

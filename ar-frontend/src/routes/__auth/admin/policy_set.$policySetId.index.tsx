@@ -4,67 +4,20 @@ import {
   useDeleteAdminPolicyFromPolicySet,
   useDeleteAdminPolicySet,
 } from "@/network/policy-set";
-import { PageLoadingFallback } from "@/components/page-loading-fallback";
 import { CatchBoundary } from "@/components/catch-boundary";
-import { Box, Typography, Stack, Button, Card } from "@mui/joy";
-import { PolicyCard } from "@/components/policy-card";
-import { z } from "zod";
-import { ConfirmDialog } from "@/components/confirm-dialog";
+import { PolicySetDetail } from "@/components/policy-set-detail-page";
 
-function DeletePolicyModal({ deletePolicyId }: { deletePolicyId: string }) {
+export const Route = createFileRoute("/__auth/admin/policy_set/$policySetId/")({
+  component: Component,
+  errorComponent: CatchBoundary,
+});
+
+function Component() {
   const navigate = useNavigate();
   const params = Route.useParams();
-  const search = Route.useSearch();
-
-  const {
-    mutateAsync: deletePolicy,
-    isPending: isDeletePending,
-    error: deleteError,
-  } = useDeleteAdminPolicyFromPolicySet({
+  const { data: policySet, isLoading } = useAdminPolicySet({
     policySetId: params.policySetId,
   });
-
-  function onSubmit() {
-    deletePolicy({ policyId: deletePolicyId }).then(() => {
-      navigate({
-        replace: true,
-        to: "/admin/policy_set/$policySetId",
-        params,
-        search: { ...search, delete_policy: undefined },
-      });
-    });
-  }
-
-  function onClose() {
-    navigate({
-      replace: true,
-      to: "/admin/policy_set/$policySetId",
-      params,
-      search: { ...search, delete_policy: undefined },
-    });
-  }
-
-  return (
-    <ConfirmDialog
-      error={deleteError}
-      isActionPending={isDeletePending}
-      onSubmitText="Delete"
-      onCancelText="Cancel"
-      onSubmit={onSubmit}
-      isOpen={Boolean(search.delete_policy)}
-      onClose={onClose}
-      title="Delete policy"
-      description="Are you sure you want to delete this policy?"
-      isDanger
-    />
-  );
-}
-
-function DeletePolicySetModal() {
-  const navigate = useNavigate();
-  const params = Route.useParams();
-  const search = Route.useSearch();
-
   const {
     mutateAsync: deletePolicySet,
     isPending: isDeletePending,
@@ -73,7 +26,7 @@ function DeletePolicySetModal() {
     policySetId: params.policySetId,
   });
 
-  function onSubmit() {
+  function onDeletePolicySet() {
     deletePolicySet().then(() => {
       navigate({
         replace: true,
@@ -82,157 +35,44 @@ function DeletePolicySetModal() {
     });
   }
 
-  function onClose() {
-    navigate({
-      replace: true,
-      to: "/admin/policy_set/$policySetId",
-      params,
-      search: { ...search, delete_policy_set: undefined },
-    });
+  const {
+    mutateAsync: deletePolicy,
+    isPending: isDeletePolicyPending,
+    error: deletePolicyError,
+  } = useDeleteAdminPolicyFromPolicySet({
+    policySetId: params.policySetId,
+  });
+
+  function onDeletePolicy(policyId: string) {
+    return deletePolicy({ policyId });
   }
 
   return (
-    <ConfirmDialog
-      error={deleteError}
-      isActionPending={isDeletePending}
-      onSubmitText="Delete"
-      onCancelText="Cancel"
-      onSubmit={onSubmit}
-      isOpen={Boolean(search.delete_policy_set)}
-      onClose={onClose}
-      title="Delete policy"
-      description="Are you sure you want to delete this policy?"
-      isDanger
+    <PolicySetDetail
+      deletePolicyPending={isDeletePolicyPending}
+      deletePolicyError={deletePolicyError}
+      onDeletePolicy={onDeletePolicy}
+      deletePolicySetPending={isDeletePending}
+      deletePolicySetError={deleteError}
+      onDeletePolicySet={onDeletePolicySet}
+      policySet={policySet}
+      isLoading={isLoading}
+      onModalClose={() => navigate({ to: "/admin/policy_set" })}
+      onEdit={(policyId: string) => {
+        navigate({
+          to: "/admin/policy_set/$policySetId/edit_policy/$policyId",
+          params: {
+            policyId: policyId,
+            policySetId: params.policySetId,
+          },
+        });
+      }}
+      onAddPolicy={() => {
+        navigate({
+          to: "/admin/policy_set/$policySetId/add_policy",
+          params: { policySetId: params.policySetId },
+        });
+      }}
     />
-  );
-}
-
-const searchSchema = z.object({
-  add_policy: z.boolean().optional(),
-  delete_policy: z.string().optional(),
-  delete_policy_set: z.boolean().optional(),
-});
-
-export const Route = createFileRoute("/__auth/admin/policy_set/$policySetId/")({
-  component: Component,
-  errorComponent: CatchBoundary,
-  validateSearch: searchSchema,
-});
-
-function Component() {
-  const navigate = useNavigate();
-  const params = Route.useParams();
-  const search = Route.useSearch();
-  const { policySetId } = Route.useParams();
-
-  const { data: policySet, isLoading } = useAdminPolicySet({
-    policySetId,
-  });
-
-  const deletePolicyId = search.delete_policy;
-
-  return (
-    <PageLoadingFallback isLoading={isLoading}>
-      {policySet && (
-        <>
-          {deletePolicyId !== undefined && (
-            <DeletePolicyModal deletePolicyId={deletePolicyId} />
-          )}
-
-          <DeletePolicySetModal />
-
-          <Stack spacing={3}>
-            <Typography level="h2">Policy set</Typography>
-
-            <Card>
-              <Stack direction="row" spacing={2}>
-                <Box>
-                  <Typography level="title-md">Access subject</Typography>
-                  <Typography>{policySet.access_subject}</Typography>
-                </Box>
-                <Box>
-                  <Typography level="title-md">Policy issuer</Typography>
-                  <Typography>{policySet.policy_issuer}</Typography>
-                </Box>
-              </Stack>
-            </Card>
-
-            <Box>
-              <Card>
-                <Typography level="title-md">Policies</Typography>
-                <Stack spacing={1} direction="row" flexWrap="wrap" useFlexGap>
-                  {policySet.policies.map((p) => (
-                    <PolicyCard
-                      policy={p}
-                      key={p.id}
-                      actions={
-                        <Stack padding={0} spacing={1} direction="row">
-                          <Button
-                            onClick={() =>
-                              navigate({
-                                to: "/admin/policy_set/$policySetId",
-                                params,
-                                search: { ...search, delete_policy: p.id },
-                              })
-                            }
-                            color="danger"
-                            variant="outlined"
-                          >
-                            Delete
-                          </Button>
-                          <Button
-                            onClick={() => {
-                              navigate({
-                                to: "/admin/policy_set/$policySetId/edit_policy/$policyId/step1",
-                                params: {
-                                  policyId: p.id,
-                                  policySetId: params.policySetId,
-                                },
-                              });
-                            }}
-                            variant="outlined"
-                          >
-                            Edit
-                          </Button>
-                        </Stack>
-                      }
-                    />
-                  ))}
-                </Stack>
-                <Box>
-                  <Button
-                    variant="soft"
-                    onClick={() =>
-                      navigate({
-                        to: "/admin/policy_set/$policySetId/add_policy/step1",
-                        params: { policySetId },
-                      })
-                    }
-                  >
-                    Add policy
-                  </Button>
-                </Box>
-              </Card>
-
-              <Stack paddingY={2} direction="row" spacing={1}>
-                <Button
-                  size="lg"
-                  color="danger"
-                  onClick={() =>
-                    navigate({
-                      to: "/admin/policy_set/$policySetId",
-                      params,
-                      search: { ...search, delete_policy_set: true },
-                    })
-                  }
-                >
-                  Delete policy set
-                </Button>
-              </Stack>
-            </Box>
-          </Stack>
-        </>
-      )}
-    </PageLoadingFallback>
   );
 }

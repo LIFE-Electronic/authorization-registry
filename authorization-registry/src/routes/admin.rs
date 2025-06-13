@@ -662,6 +662,56 @@ mod test {
         Ok(())
     }
 
+     #[sqlx::test]
+    async fn test_insert_policy_set_template_with_description(
+        _pool_options: PgPoolOptions,
+        conn_option: PgConnectOptions,
+    ) -> sqlx::Result<()> {
+        let db = init_test_db(&conn_option).await;
+        let app = get_test_app(db);
+
+        let request_body = create_request_body(&json!({
+            "name": "Usual dexspace data consumer stuff",
+            "access_subject": "hello",
+            "policy_issuer": "hello again",
+            "description": "this is a nice pt",
+            "policies": [
+              {
+                "resource_type": "Fishes",
+                "identifiers": ["*"],
+                "attributes": ["*"],
+                "actions": ["Read", "Delete", "Create", "Edit"],
+                "service_providers": ["NL.EORI.LIFEELEC4DMI"],
+                "rules": [
+                  {
+                    "effect": "Permit"
+                  }
+                ]
+              }
+            ]
+        }));
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/admin/policy-set-template")
+                    .method("POST")
+                    .header(
+                        AUTHORIZATION,
+                        server_token::server_token_test_helper::get_human_token_header(None, None),
+                    )
+                    .header("Content-Type", "application/json")
+                    .body(Body::new(request_body))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+
+        Ok(())
+    }
+
     #[sqlx::test]
     async fn test_insert_delete_policy_set_template(
         _pool_options: PgPoolOptions,
