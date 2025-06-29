@@ -93,11 +93,27 @@ pub struct MatchingPolicySetRow {
     pub max_delegation_depth: i32,
 }
 
-pub async fn get_policy_sets_with_policies(
+#[derive(Deserialize, Serialize, Debug, ToSchema)]
+struct Pagination {
+    total_count: i64,
+}
+
+#[derive(Deserialize, Serialize, Debug, ToSchema)]
+pub struct PolicySetsWithPagination {
+    pub data: Vec<MatchingPolicySetRow>,
+    pagination: Pagination,
+}
+
+#[derive(Debug, FromQueryResult)]
+struct Count {
+    count: i64,
+}
+
+pub async fn get_total_number_of_policy_sets(
     access_subject: Option<String>,
     policy_issuer: Option<String>,
     db: &DatabaseConnection,
-) -> anyhow::Result<Vec<MatchingPolicySetRow>> {
+) -> anyhow::Result<i64> {
     let mut conditions = Vec::new();
     let mut values: Vec<Value> = Vec::new();
 
@@ -117,6 +133,71 @@ pub async fn get_policy_sets_with_policies(
     } else {
         "".to_owned()
     };
+
+    let sql = format!(
+        r#"
+        SELECT
+            COUNT(*) as count
+        FROM
+            policy_set ps
+        {}
+        "#,
+        condition
+    );
+
+    tracing::info!("condition: {} {:?}", condition, values);
+
+    let stmt = Statement::from_sql_and_values(sea_orm::DatabaseBackend::Postgres, sql, values);
+
+    let result = Count::find_by_statement(stmt)
+        .one(db)
+        .await
+        .context("Error fetching number of policy sets")?
+        .expect("At least one row with the count");
+
+    Ok(result.count)
+}
+
+pub async fn get_policy_sets_with_policies(
+    access_subject: Option<String>,
+    policy_issuer: Option<String>,
+    skip: Option<u32>,
+    limit: Option<u32>,
+    db: &DatabaseConnection,
+) -> anyhow::Result<PolicySetsWithPagination> {
+    let mut conditions = Vec::new();
+    let mut values: Vec<Value> = Vec::new();
+
+    if let Some(access_subject) = &access_subject {
+        conditions.push(format!("access_subject like ${}", values.len() + 1));
+        values.push(format!("%{}%", access_subject).into());
+    }
+
+    if let Some(policy_issuer) = &policy_issuer {
+        conditions.push(format!("policy_issuer like ${}", values.len() + 1));
+        values.push(format!("%{}%", policy_issuer).into());
+    }
+
+    let condition = if conditions.len() > 0 {
+        let joined_conditions: String = conditions.join(" and ");
+        format!("where ({joined_conditions})")
+    } else {
+        "".to_owned()
+    };
+
+    let mut paginations = Vec::new();
+
+    if let Some(limit) = limit {
+        paginations.push(format!(" LIMIT ${}", values.len() + 1));
+        values.push(limit.into());
+    }
+
+    if let Some(skip) = skip {
+        paginations.push(format!(" OFFSET ${}", values.len() + 1));
+        values.push(skip.into());
+    }
+
+    let pagination = paginations.join(" ");
 
     let sql = format!(
         r#"
@@ -158,11 +239,13 @@ pub async fn get_policy_sets_with_policies(
         order by
             ps.created
             desc
+        {}
     "#,
-        condition
+        condition, pagination,
     );
 
-    let stmt = Statement::from_sql_and_values(sea_orm::DatabaseBackend::Postgres, sql, values);
+    let stmt =
+        Statement::from_sql_and_values(sea_orm::DatabaseBackend::Postgres, sql, values.clone());
 
     let raw_result = JsonValue::find_by_statement(stmt)
         .all(db)
@@ -177,7 +260,14 @@ pub async fn get_policy_sets_with_policies(
     let policy_sets = policy_sets_parse_result
         .context("Error parsing policy sets 'QueryResult' into 'MatchingPolicySetRow'")?;
 
-    Ok(policy_sets)
+    let total_count = get_total_number_of_policy_sets(access_subject, policy_issuer, db)
+        .await
+        .context("Error getting total number of policy sets")?;
+
+    Ok(PolicySetsWithPagination {
+        data: policy_sets,
+        pagination: Pagination { total_count },
+    })
 }
 
 pub async fn get_own_policy_sets_with_policies(

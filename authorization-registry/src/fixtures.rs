@@ -1,8 +1,8 @@
 #[cfg(test)]
 pub mod fixtures {
     #[derive(Deserialize)]
-    struct PolicySetFixture {
-        policy_set: ar_entity::policy_set::Model,
+    pub struct PolicySetFixture {
+        pub policy_set: ar_entity::policy_set::Model,
         policies: Vec<ar_entity::policy::Model>,
     }
 
@@ -25,7 +25,7 @@ pub mod fixtures {
         return serde_json::from_str::<ar_entity::ishare_user::Model>(&content).unwrap();
     }
 
-    fn load_policy_set_fixture(path: &str) -> PolicySetFixture {
+    pub fn load_policy_set_fixture(path: &str) -> PolicySetFixture {
         let content = std::fs::read_to_string(path).expect("Can't load policy set fixture");
         return serde_json::from_str::<PolicySetFixture>(&content)
             .expect(format!("can't deserialize policy set in {path}").as_str());

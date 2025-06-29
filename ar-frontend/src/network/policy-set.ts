@@ -42,6 +42,13 @@ const policySetWithPoliciesSchema = z.object({
   policy_issuer: z.string(),
 });
 
+const adminPolicySetsResponse = z.object({
+  data: z.array(policySetWithPoliciesSchema),
+  pagination: z.object({
+    total_count: z.number(),
+  }),
+});
+
 export type Policy = z.infer<typeof policySchema>;
 export type PolicySetWithPolicies = z.infer<typeof policySetWithPoliciesSchema>;
 
@@ -90,9 +97,13 @@ export function usePolicySet({ policySetId }: { policySetId: string }) {
 export function useAdminPolicySets({
   accessSubject,
   policyIssuer,
+  skip,
+  limit,
 }: {
   accessSubject?: string;
   policyIssuer?: string;
+  skip?: number;
+  limit?: number;
 }) {
   const search = new URLSearchParams();
   const authenticatedFetch = useAuthenticatedFetch();
@@ -105,6 +116,14 @@ export function useAdminPolicySets({
     search.append("policy_issuer", policyIssuer);
   }
 
+  if (skip) {
+    search.append("skip", skip.toString());
+  }
+
+  if (limit) {
+    search.append("limit", limit.toString());
+  }
+
   return useQuery({
     throwOnError: true,
     queryKey: ["admin", "policy-sets", search.toString()],
@@ -115,7 +134,7 @@ export function useAdminPolicySets({
       const json = await response.json();
 
       try {
-        return z.array(policySetWithPoliciesSchema).parse(json);
+        return adminPolicySetsResponse.parse(json);
       } catch (e) {
         console.error(e);
       }
