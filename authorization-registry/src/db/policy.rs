@@ -93,13 +93,29 @@ pub struct MatchingPolicySetRow {
     pub max_delegation_depth: i32,
 }
 
-pub async fn get_policy_sets_with_policies(
+#[derive(Deserialize, Serialize, Debug, ToSchema)]
+struct Pagination {
+    total_count: i64,
+}
+
+#[derive(Deserialize, Serialize, Debug, ToSchema)]
+pub struct PolicySetsWithPagination {
+    pub data: Vec<MatchingPolicySetRow>,
+    pagination: Pagination,
+}
+
+#[derive(Debug, FromQueryResult)]
+struct Count {
+    count: i64,
+}
+
+fn build_policy_set_condition(
     access_subject: Option<String>,
     policy_issuer: Option<String>,
-    db: &DatabaseConnection,
-) -> anyhow::Result<Vec<MatchingPolicySetRow>> {
+    q: Option<String>,
+    values: &mut Vec<Value>,
+) -> String {
     let mut conditions = Vec::new();
-    let mut values: Vec<Value> = Vec::new();
 
     if let Some(access_subject) = access_subject {
         conditions.push(format!("access_subject like ${}", values.len() + 1));
@@ -112,11 +128,106 @@ pub async fn get_policy_sets_with_policies(
     }
 
     let condition = if conditions.len() > 0 {
-        let joined_conditions: String = conditions.join(" and ");
-        format!("where ({joined_conditions})")
+        let joined_conditions: String = conditions.join(" or ");
+        format!("({joined_conditions})")
     } else {
         "".to_owned()
     };
+
+    let query_condition = match q {
+        Some(q) => {
+            values.push(format!("%{}%", q).into());
+            format!(
+                r#"(
+                    access_subject like ${0}
+                    or policy_issuer like ${0}
+                    or exists (select * from policy where policy.policy_set = ps.id and policy.resource_type like ${0})
+                    or exists (select * from policy where policy.policy_set = ps.id and exists (select * from policy, unnest(policy.identifiers) as temp_id where policy.policy_set = ps.id and temp_id like ${0}))
+                    or exists (select * from policy where policy.policy_set = ps.id and exists (select * from policy, unnest(policy.attributes) as temp_id where policy.policy_set = ps.id and temp_id like ${0}))
+                    or exists (select * from policy where policy.policy_set = ps.id and exists (select * from policy, unnest(policy.service_providers) as temp_id where policy.policy_set = ps.id and temp_id like ${0}))
+                )"#,
+                values.len()
+            )
+        }
+        None => "".to_string(),
+    };
+
+    let non_empty_conditions: Vec<String> = [condition, query_condition]
+        .into_iter()
+        .filter(|q| q.len() > 0)
+        .collect();
+
+    let joined_condition = if non_empty_conditions.len() > 0 {
+        format!("where ({})", non_empty_conditions.join(" and "))
+    } else {
+        "".to_string()
+    };
+
+    return joined_condition;
+}
+
+pub async fn get_total_number_of_policy_sets(
+    access_subject: Option<String>,
+    policy_issuer: Option<String>,
+    q: Option<String>,
+    db: &DatabaseConnection,
+) -> anyhow::Result<i64> {
+    let mut values = Vec::new();
+    let joined_condition =
+        build_policy_set_condition(access_subject, policy_issuer, q, &mut values);
+
+    let sql = format!(
+        r#"
+        SELECT
+            COUNT(*) as count
+        FROM
+            policy_set ps
+        {}
+        "#,
+        joined_condition
+    );
+
+    let stmt = Statement::from_sql_and_values(sea_orm::DatabaseBackend::Postgres, sql, values);
+
+    let result = Count::find_by_statement(stmt)
+        .one(db)
+        .await
+        .context("Error fetching number of policy sets")?
+        .expect("At least one row with the count");
+
+    Ok(result.count)
+}
+
+pub async fn get_policy_sets_with_policies(
+    access_subject: Option<String>,
+    policy_issuer: Option<String>,
+    q: Option<String>,
+    skip: Option<u32>,
+    limit: Option<u32>,
+    db: &DatabaseConnection,
+) -> anyhow::Result<PolicySetsWithPagination> {
+    let mut values: Vec<Value> = Vec::new();
+
+    let joined_condition = build_policy_set_condition(
+        access_subject.clone(),
+        policy_issuer.clone(),
+        q.clone(),
+        &mut values,
+    );
+
+    let mut paginations = Vec::new();
+
+    if let Some(limit) = limit {
+        paginations.push(format!(" LIMIT ${}", values.len() + 1));
+        values.push(limit.into());
+    }
+
+    if let Some(skip) = skip {
+        paginations.push(format!(" OFFSET ${}", values.len() + 1));
+        values.push(skip.into());
+    }
+
+    let pagination = paginations.join(" ");
 
     let sql = format!(
         r#"
@@ -158,90 +269,14 @@ pub async fn get_policy_sets_with_policies(
         order by
             ps.created
             desc
-    "#,
-        condition
-    );
-
-    let stmt = Statement::from_sql_and_values(sea_orm::DatabaseBackend::Postgres, sql, values);
-
-    let raw_result = JsonValue::find_by_statement(stmt)
-        .all(db)
-        .await
-        .context("Error fetching policy sets from database")?;
-
-    let policy_sets_parse_result: Result<Vec<MatchingPolicySetRow>, serde_json::Error> = raw_result
-        .iter()
-        .map(|r| serde_json::from_value::<MatchingPolicySetRow>(r.to_owned()))
-        .collect();
-
-    let policy_sets = policy_sets_parse_result
-        .context("Error parsing policy sets 'QueryResult' into 'MatchingPolicySetRow'")?;
-
-    Ok(policy_sets)
-}
-
-pub async fn get_own_policy_sets_with_policies(
-    eori: &str,
-    db: &DatabaseConnection,
-) -> anyhow::Result<Vec<MatchingPolicySetRow>> {
-    let mut conditions = Vec::new();
-    let mut values: Vec<Value> = Vec::new();
-
-    conditions.push(format!("access_subject like ${}", values.len() + 1));
-    values.push(format!("%{}%", &eori).into());
-
-    conditions.push(format!("policy_issuer like ${}", values.len() + 1));
-    values.push(format!("%{}%", &eori).into());
-
-    let condition = if conditions.len() > 0 {
-        let joined_conditions: String = conditions.join(" or ");
-        format!("where ({joined_conditions})")
-    } else {
-        "".to_owned()
-    };
-
-    let sql = format!(
-        r#"
-            select
-            ps.id as policy_set_id,
-            ps.access_subject as access_subject,
-            ps.policy_issuer as policy_issuer,
-            ps.licenses as licenses,
-            ps.max_delegation_depth as max_delegation_depth,
-            coalesce(
-                array_agg(
-                    json_build_object(
-                        'id',
-                        p.id,
-                        'identifiers',
-                        p.identifiers,
-                        'attributes',
-                        p.attributes,
-                        'actions',
-                        p.actions,
-                        'service_providers',
-                        p.service_providers,
-                        'resource_type',
-                        p.resource_type,
-                        'rules',
-                        p.rules
-                    )
-                ) filter (where p.id is not null),
-                '{{}}'
-            ) as policies
-        from
-            policy_set ps
-        left join
-            policy p
-                on p.policy_set = ps.id
         {}
-        group by
-            ps.id
+   
     "#,
-        condition
+        joined_condition, pagination,
     );
 
-    let stmt = Statement::from_sql_and_values(sea_orm::DatabaseBackend::Postgres, sql, values);
+    let stmt =
+        Statement::from_sql_and_values(sea_orm::DatabaseBackend::Postgres, sql, values.clone());
 
     let raw_result = JsonValue::find_by_statement(stmt)
         .all(db)
@@ -256,7 +291,14 @@ pub async fn get_own_policy_sets_with_policies(
     let policy_sets = policy_sets_parse_result
         .context("Error parsing policy sets 'QueryResult' into 'MatchingPolicySetRow'")?;
 
-    Ok(policy_sets)
+    let total_count = get_total_number_of_policy_sets(access_subject, policy_issuer, q, db)
+        .await
+        .context("Error getting total number of policy sets")?;
+
+    Ok(PolicySetsWithPagination {
+        data: policy_sets,
+        pagination: Pagination { total_count },
+    })
 }
 
 pub async fn get_policy_set_with_policies(

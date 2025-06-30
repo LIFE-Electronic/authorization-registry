@@ -11,25 +11,24 @@ import {
 } from "@tanstack/react-router";
 import { useDebounce } from "@uidotdev/usehooks";
 import { useState } from "react";
+import { Pagination } from "@/components/pagination";
+
+const ITEMS_ON_PAGE = 3;
 
 export const Route = createFileRoute("/__auth/admin/policy_set")({
   component: Component,
 });
 
 function Component() {
-  const [accessSubject, setAccessSubject] = useState<string | undefined>(
-    undefined,
-  );
-  const [policyIssuer, setPolicyIssuer] = useState<string | undefined>(
-    undefined,
-  );
+  const [page, setPage] = useState(1);
+  const [q, setQ] = useState<string>("");
+  const deboundedQ = useDebounce(q, 300);
 
-  const deboundedAccessSubject = useDebounce(accessSubject, 300);
-  const debouncedPolicyIssuer = useDebounce(policyIssuer, 300);
   const navigate = useNavigate();
   const { data: policySets, isLoading } = useAdminPolicySets({
-    accessSubject: deboundedAccessSubject,
-    policyIssuer: debouncedPolicyIssuer,
+    q: deboundedQ,
+    skip: ITEMS_ON_PAGE * (page - 1),
+    limit: ITEMS_ON_PAGE,
   });
 
   return (
@@ -47,28 +46,29 @@ function Component() {
         alignItems="flex-end"
       >
         <Box sx={{ width: 180 }}>
-          <FormLabel>Policy issuer</FormLabel>
+          <FormLabel>Search</FormLabel>
           <Input
             size="sm"
-            value={policyIssuer}
+            value={q}
             onChange={(e) => {
-              setPolicyIssuer(e.target.value);
+              setQ(e.target.value);
+              setPage(1);
             }}
           />
         </Box>
-        <Box sx={{ width: 180 }}>
-          <FormLabel>Access subject</FormLabel>
-          <Input
-            size="sm"
-            value={accessSubject}
-            onChange={(e) => setAccessSubject(e.target.value)}
-          />
-        </Box>
-        <Box></Box>
       </Stack>
       <PageLoadingFallback isLoading={isLoading}>
-        <Stack spacing={1}>
-          {policySets?.map((ps) => (
+        <Stack spacing={1} paddingBottom={2}>
+          <Box display="flex" paddingY={2}>
+            <Pagination
+              itemsOnPage={ITEMS_ON_PAGE}
+              page={page}
+              onPageChange={(page) => setPage(page)}
+              numberOfItems={policySets?.pagination.total_count || 0}
+            />
+          </Box>
+
+          {policySets?.data.map((ps) => (
             <Link
               key={ps.policy_set_id}
               style={{

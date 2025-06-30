@@ -1,0 +1,25 @@
+{
+  "policy_set": {
+    "policy_issuer": "NL.44444",
+    "access_subject": "NL.CONSUME_TOO_MUCH",
+    "id": "c84a9860-d19c-4da2-8d2e-e8e1189c79fb",
+    "licenses": [],
+    "max_delegation_depth": 2
+  },
+  "policies": [
+    {
+      "id": "078818ed-53e0-46f5-ad69-32c31fd3428b",
+      "policy_set": "c84a9860-d19c-4da2-8d2e-e8e1189c79fb",
+      "resource_type": "TestResource",
+      "identifiers": ["test4"],
+      "attributes": ["zingers"],
+      "actions": ["Read", "Delete"],
+      "service_providers": ["good-company"],
+      "rules": [
+        {
+          "effect": "Permit"
+        }
+      ]
+    }
+  ]
+}

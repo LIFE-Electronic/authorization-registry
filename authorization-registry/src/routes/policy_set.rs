@@ -1,6 +1,6 @@
 use anyhow::Context;
 use ar_entity::delegation_evidence::Policy;
-use axum::extract::Path;
+use axum::extract::{Path, Query};
 use axum::routing::delete;
 use axum::{
     extract::State, middleware::from_fn_with_state, routing::post, Extension, Json, Router,
@@ -8,12 +8,12 @@ use axum::{
 use axum_extra::extract::WithRejection;
 use reqwest::StatusCode;
 use sea_orm::DatabaseConnection;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use crate::db::policy::MatchingPolicySetRow;
+use crate::db::policy::{MatchingPolicySetRow, PolicySetsWithPagination};
 use crate::error::{ErrorResponse, ExpectedError};
 use crate::services::policy::{self as policy_service};
 use crate::{db::policy as policy_store, services::server_token::Role};
@@ -32,11 +32,23 @@ pub fn get_policy_set_routes(server_token: Arc<ServerToken>) -> Router<AppState>
         .layer(from_fn_with_state(server_token, extract_role_middleware));
 }
 
+#[derive(Deserialize)]
+struct GetPolicySetsQuery {
+    q: Option<String>,
+    limit: Option<u32>,
+    skip: Option<u32>,
+}
+
 /// Retrieve all policy sets belonging to the authenticated company
 #[utoipa::path(
     get,
     path = "/policy-sets",
     tag = "Policy Management",
+    params(
+        ("limit" = Option<u32>, Query, description = "Limit the number of results for pagination"),
+        ("skip" = Option<u32>, Query, description = "Skip a number of results for pagination"),
+        ("q" = Option<String>, Query, description = "Filter on any match in the policy set"),
+    ),
     security(
         ("bearer" = [])
     ),
@@ -56,12 +68,20 @@ pub fn get_policy_set_routes(server_token: Arc<ServerToken>) -> Router<AppState>
     )
  )]
 async fn get_all_policy_sets(
+    Query(query): Query<GetPolicySetsQuery>,
     Extension(role): Extension<Role>,
     Extension(db): Extension<DatabaseConnection>,
-) -> Result<Json<Vec<MatchingPolicySetRow>>, AppError> {
-    let policy_sets = policy_store::get_own_policy_sets_with_policies(&role.get_company_id(), &db)
-        .await
-        .context("Error getting policy sets")?;
+) -> Result<Json<PolicySetsWithPagination>, AppError> {
+    let policy_sets = policy_store::get_policy_sets_with_policies(
+        Some(role.get_company_id().to_string()),
+        Some(role.get_company_id().to_string()),
+        query.q,
+        query.skip,
+        query.limit,
+        &db,
+    )
+    .await
+    .context("Error getting policy sets")?;
 
     Ok(Json(policy_sets))
 }

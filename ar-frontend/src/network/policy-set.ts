@@ -42,6 +42,13 @@ const policySetWithPoliciesSchema = z.object({
   policy_issuer: z.string(),
 });
 
+const policySetsResponse = z.object({
+  data: z.array(policySetWithPoliciesSchema),
+  pagination: z.object({
+    total_count: z.number(),
+  }),
+});
+
 export type Policy = z.infer<typeof policySchema>;
 export type PolicySetWithPolicies = z.infer<typeof policySetWithPoliciesSchema>;
 
@@ -88,21 +95,27 @@ export function usePolicySet({ policySetId }: { policySetId: string }) {
 }
 
 export function useAdminPolicySets({
-  accessSubject,
-  policyIssuer,
+  q,
+  skip,
+  limit,
 }: {
-  accessSubject?: string;
-  policyIssuer?: string;
+  q?: string;
+  skip?: number;
+  limit?: number;
 }) {
   const search = new URLSearchParams();
   const authenticatedFetch = useAuthenticatedFetch();
 
-  if (accessSubject) {
-    search.append("access_subject", accessSubject);
+  if (q) {
+    search.append("q", q);
   }
 
-  if (policyIssuer) {
-    search.append("policy_issuer", policyIssuer);
+  if (skip) {
+    search.append("skip", skip.toString());
+  }
+
+  if (limit) {
+    search.append("limit", limit.toString());
   }
 
   return useQuery({
@@ -115,7 +128,7 @@ export function useAdminPolicySets({
       const json = await response.json();
 
       try {
-        return z.array(policySetWithPoliciesSchema).parse(json);
+        return policySetsResponse.parse(json);
       } catch (e) {
         console.error(e);
       }
@@ -123,18 +136,41 @@ export function useAdminPolicySets({
   });
 }
 
-export function usePolicySets() {
+export function usePolicySets({
+  q,
+  skip,
+  limit,
+}: {
+  q?: string;
+  skip?: number;
+  limit?: number;
+}) {
+  const search = new URLSearchParams();
   const authenticatedFetch = useAuthenticatedFetch();
+
+  if (q) {
+    search.append("q", q);
+  }
+
+  if (skip) {
+    search.append("skip", skip.toString());
+  }
+
+  if (limit) {
+    search.append("limit", limit.toString());
+  }
 
   return useQuery({
     throwOnError: true,
-    queryKey: ["member", "policy-sets"],
+    queryKey: ["member", "policy-sets", search.toString()],
     queryFn: async function () {
-      const response = await authenticatedFetch(`${baseAPIUrl}/policy-set`);
+      const response = await authenticatedFetch(
+        `${baseAPIUrl}/policy-set?${search}`,
+      );
       const json = await response.json();
 
       try {
-        return z.array(policySetWithPoliciesSchema).parse(json);
+        return policySetsResponse.parse(json);
       } catch (e) {
         console.error(e);
       }
