@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ishare = { version = "0.10.0" }
+ishare = { version = "0.10.1" }
 ar_migration = { path = "migration" }
 ar_entity = { path = "entity" }
 axum = "0.7.5"

@@ -9,8 +9,7 @@ export function initLogin() {
   async function run() {
     try {
       const baseUrl = `${window.location.protocol}//${window.location.hostname}${window.location.port ? `:${window.location.port}` : ""}`;
-      const redirectUrl = `${baseUrl}/callback`;
-      // const redirectUrl = encodeURIComponent(window.location.href);
+      const redirectUrl = `${baseUrl}/callback?state=${`${window.location.pathname}${window.location.search}${window.location.hash}`}`;
       const getParamsUrl = `${baseAPIUrl}/connect/human/auth_params?redirect_uri=${redirectUrl}`;
       const params = await (await fetch(getParamsUrl)).json();
 

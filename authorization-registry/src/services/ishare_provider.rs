@@ -160,7 +160,7 @@ impl SatelliteProvider for ISHAREProvider {
 
             let client_assertion = self
                 .ishare
-                .create_client_assertion(self.ishare.sattelite_eori.clone())?;
+                .create_client_assertion(self.ishare.satellite_eori.clone())?;
             let token_response = self
                 .ishare
                 .get_satelite_access_token(&client_assertion)

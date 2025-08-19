@@ -242,6 +242,7 @@ async fn main() {
             Some(config.ishare_ca_path),
             config.client_eori.clone(),
             config.satellite_eori,
+            config.dataspace_config.clone(),
         )
         .unwrap(),
     );
