@@ -6,8 +6,8 @@ use crate::services::server_token::ServerToken;
 use ar_migration::{Migrator, MigratorTrait};
 
 use axum::async_trait;
-use axum::Extension;
 use axum::extract::MatchedPath;
+use axum::Extension;
 use axum::{extract::FromRef, Router};
 use clap::Parser;
 use ishare::ishare::ISHARE;
@@ -20,11 +20,11 @@ use routes::policy_set_template::get_policy_set_template_routes;
 use sea_orm::Database;
 use sea_orm::DatabaseConnection;
 use seed::apply_seeds;
-use tracing::Level;
-use tracing_subscriber::EnvFilter;
 use std::sync::Arc;
 use tower_http::cors::{AllowHeaders, AllowMethods, AllowOrigin, CorsLayer};
 use tower_http::trace::{DefaultOnResponse, TraceLayer};
+use tracing::Level;
+use tracing_subscriber::EnvFilter;
 use utoipa::{
     openapi::security::{ApiKey, ApiKeyValue, SecurityScheme},
     Modify, OpenApi,
