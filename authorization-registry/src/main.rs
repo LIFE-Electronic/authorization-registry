@@ -6,6 +6,7 @@ use crate::services::server_token::ServerToken;
 use ar_migration::{Migrator, MigratorTrait};
 
 use axum::async_trait;
+use axum::extract::MatchedPath;
 use axum::Extension;
 use axum::{extract::FromRef, Router};
 use clap::Parser;
@@ -21,7 +22,9 @@ use sea_orm::DatabaseConnection;
 use seed::apply_seeds;
 use std::sync::Arc;
 use tower_http::cors::{AllowHeaders, AllowMethods, AllowOrigin, CorsLayer};
-use tower_http::trace::TraceLayer;
+use tower_http::trace::{DefaultOnResponse, TraceLayer};
+use tracing::Level;
+use tracing_subscriber::EnvFilter;
 use utoipa::{
     openapi::security::{ApiKey, ApiKeyValue, SecurityScheme},
     Modify, OpenApi,
@@ -178,28 +181,10 @@ pub fn get_app(db: DatabaseConnection, app_state: AppState, disable_cors_check: 
         .nest("/config", config_routes)
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .layer(
-            TraceLayer::new_for_http().make_span_with(|request: &axum::http::Request<_>| {
-                let matched_path = request
-                    .extensions()
-                    .get::<axum::extract::MatchedPath>()
-                    .map(axum::extract::MatchedPath::as_str);
-
-                let span = tracing::info_span!(
-                    "http_request",
-                    method = ?request.method(),
-                    matched_path,
-                    some_other_field = tracing::field::Empty,
-                );
-                span.in_scope(|| {
-                    tracing::info!(
-                        "Incoming request [method = {}, path = \"{}\"]",
-                        request.method(),
-                        request.uri()
-                    );
-                });
-
-                span
-            }),
+            TraceLayer::new_for_http()
+                .make_span_with(control_plane_logging::make_http_span)
+                .on_request(control_plane_logging::on_http_request)
+                .on_response(control_plane_logging::get_on_http_response()),
         )
         .layer(Extension(db))
         .with_state(app_state);
@@ -221,9 +206,7 @@ async fn main() {
     let args = Args::parse();
     let config = config::read_config(args.config_path);
 
-    tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::filter::EnvFilter::from_default_env())
-        .init();
+    control_plane_logging::init_tracing();
 
     tracing::info!("Deploy route: {}", config.deploy_route);
 
