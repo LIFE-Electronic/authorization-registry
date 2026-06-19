@@ -6,7 +6,6 @@ use crate::services::server_token::ServerToken;
 use ar_migration::{Migrator, MigratorTrait};
 
 use axum::async_trait;
-use axum::extract::MatchedPath;
 use axum::Extension;
 use axum::{extract::FromRef, Router};
 use clap::Parser;
@@ -22,9 +21,7 @@ use sea_orm::DatabaseConnection;
 use seed::apply_seeds;
 use std::sync::Arc;
 use tower_http::cors::{AllowHeaders, AllowMethods, AllowOrigin, CorsLayer};
-use tower_http::trace::{DefaultOnResponse, TraceLayer};
-use tracing::Level;
-use tracing_subscriber::EnvFilter;
+use tower_http::trace::TraceLayer;
 use utoipa::{
     openapi::security::{ApiKey, ApiKeyValue, SecurityScheme},
     Modify, OpenApi,

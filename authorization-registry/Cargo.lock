@@ -137,6 +137,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "ar_delegation"
+version = "0.1.0"
+dependencies = [
+ "ar_entity",
+ "ishare 0.11.1",
+]
+
+[[package]]
 name = "ar_entity"
 version = "0.1.0"
 dependencies = [
@@ -359,6 +367,7 @@ name = "authorization_registry"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "ar_delegation",
  "ar_entity",
  "ar_migration",
  "axum",
@@ -368,7 +377,7 @@ dependencies = [
  "clap",
  "control_plane_logging",
  "http-body-util",
- "ishare 0.11.0",
+ "ishare 0.11.1",
  "jsonwebtoken",
  "reqwest",
  "sea-orm",
@@ -1726,9 +1735,9 @@ dependencies = [
 
 [[package]]
 name = "ishare"
-version = "0.11.0"
+version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2102e5e41d8bc2614591047fb1fd7e23a198c29205b8e068b8d2b5454f5e9346"
+checksum = "513db348950cf263ef6a75ee54a726a141add7ec5d798010ef9afa143f2516d7"
 dependencies = [
  "anyhow",
  "async-trait",

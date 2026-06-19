@@ -1,10 +1,11 @@
 use anyhow::{bail, Context};
-use ar_entity::delegation_evidence::{Policy, ResourceRule};
+use ar_entity::delegation_evidence::Policy;
+
+pub use ar_entity::delegation_evidence::MatchingPolicySetRow;
 use chrono::Utc;
 use sea_orm::{self, ConnectionTrait, QueryFilter, TransactionTrait};
 use sea_orm::{
-    entity::*, DatabaseConnection, EntityTrait, FromJsonQueryResult, FromQueryResult, JsonValue,
-    Statement,
+    entity::*, DatabaseConnection, EntityTrait, FromQueryResult, JsonValue, Statement,
 };
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -70,27 +71,6 @@ pub async fn get_policies_by_policy_set(
         .context("Error getting policies from db")?;
 
     Ok(policies)
-}
-
-#[derive(FromJsonQueryResult, Serialize, Deserialize, Debug, ToSchema)]
-pub struct DelegationEvidencePolicy {
-    pub id: Uuid,
-    pub identifiers: Vec<String>,
-    pub resource_type: String,
-    pub attributes: Vec<String>,
-    pub actions: Vec<String>,
-    pub service_providers: Vec<String>,
-    pub rules: Vec<ResourceRule>,
-}
-
-#[derive(Deserialize, Serialize, Debug, FromQueryResult, ToSchema)]
-pub struct MatchingPolicySetRow {
-    pub policy_set_id: Uuid,
-    pub access_subject: String,
-    pub policy_issuer: String,
-    pub policies: Vec<DelegationEvidencePolicy>,
-    pub licenses: Vec<String>,
-    pub max_delegation_depth: i32,
 }
 
 #[derive(Deserialize, Serialize, Debug, ToSchema)]

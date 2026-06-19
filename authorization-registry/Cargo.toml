@@ -6,9 +6,10 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ishare = "0.11.0"
+ishare = "0.11.1"
 ar_migration = { path = "migration" }
 ar_entity = { path = "entity" }
+ar_delegation = { path = "ar_delegation" }
 axum = "0.7.5"
 tokio = { version = "1.37.0", features = ['rt', 'rt-multi-thread'] } 
 tower-http = { version = "0.5.2", features = ["trace", "cors"] }

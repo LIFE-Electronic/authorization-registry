@@ -3,6 +3,7 @@ use sea_orm::FromJsonQueryResult;
 use sea_orm::FromQueryResult;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, Debug, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -89,4 +90,25 @@ pub enum ResourceRule {
 #[serde(rename_all = "camelCase")]
 pub struct Environment {
     pub service_providers: Vec<String>,
+}
+
+#[derive(FromJsonQueryResult, Serialize, Deserialize, Clone, Debug, ToSchema)]
+pub struct DelegationEvidencePolicy {
+    pub id: Uuid,
+    pub identifiers: Vec<String>,
+    pub resource_type: String,
+    pub attributes: Vec<String>,
+    pub actions: Vec<String>,
+    pub service_providers: Vec<String>,
+    pub rules: Vec<ResourceRule>,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, FromQueryResult, ToSchema)]
+pub struct MatchingPolicySetRow {
+    pub policy_set_id: Uuid,
+    pub access_subject: String,
+    pub policy_issuer: String,
+    pub policies: Vec<DelegationEvidencePolicy>,
+    pub licenses: Vec<String>,
+    pub max_delegation_depth: i32,
 }
