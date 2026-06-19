@@ -4,9 +4,7 @@ use ar_entity::delegation_evidence::Policy;
 pub use ar_entity::delegation_evidence::MatchingPolicySetRow;
 use chrono::Utc;
 use sea_orm::{self, ConnectionTrait, QueryFilter, TransactionTrait};
-use sea_orm::{
-    entity::*, DatabaseConnection, EntityTrait, FromQueryResult, JsonValue, Statement,
-};
+use sea_orm::{entity::*, DatabaseConnection, EntityTrait, FromQueryResult, JsonValue, Statement};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;

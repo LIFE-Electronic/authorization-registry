@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
 use anyhow::Context;
-use ishare::delegation_evidence::{DelegationEvidence, DelegationEvidenceContainer, DelegationTarget};
+use ishare::delegation_evidence::{
+    DelegationEvidence, DelegationEvidenceContainer, DelegationTarget,
+};
 use ishare::delegation_request::DelegationRequest;
 use sea_orm::DatabaseConnection;
 
@@ -125,8 +127,8 @@ mod tests {
 
     use crate::test_helpers::helpers::TestSatelliteProvider;
 
-    use ar_delegation::*;
     use super::*;
+    use ar_delegation::*;
 
     #[test]
     fn test_check_delegation_access_as_match() {
