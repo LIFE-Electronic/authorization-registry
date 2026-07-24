@@ -166,6 +166,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "ar_test"
+version = "0.1.0"
+dependencies = [
+ "ar_delegation",
+ "ar_entity",
+ "ishare 0.11.1",
+ "uuid",
+]
+
+[[package]]
 name = "arbitrary"
 version = "1.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

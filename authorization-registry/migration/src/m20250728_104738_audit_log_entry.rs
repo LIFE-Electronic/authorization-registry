@@ -2,7 +2,6 @@ use sea_orm_migration::prelude::*;
 
 use crate::m20250619_124921_add_audit_log_table::AuditEvent;
 
-
 #[derive(DeriveMigrationName)]
 pub struct Migration;
 
@@ -13,7 +12,11 @@ impl MigrationTrait for Migration {
             .alter_table(
                 Table::alter()
                     .table(AuditEvent::Table)
-                    .add_column(ColumnDef::new(AuditEvent::EntryId).text().default("".to_owned()))
+                    .add_column(
+                        ColumnDef::new(AuditEvent::EntryId)
+                            .text()
+                            .default("".to_owned()),
+                    )
                     .to_owned(),
             )
             .await
