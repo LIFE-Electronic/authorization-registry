@@ -1,0 +1,8 @@
+[package]
+name = "ar_delegation"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ar_entity = { path = "../entity" }
+ishare = "0.11.1"
