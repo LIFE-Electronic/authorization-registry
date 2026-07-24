@@ -1,0 +1,10 @@
+[package]
+name = "ar_test"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ar_entity = { path = "../entity" }
+ar_delegation = { path = "../ar_delegation" }
+ishare = "0.11.1"
+uuid = { version = "1.8.0", features = ["v4"] }

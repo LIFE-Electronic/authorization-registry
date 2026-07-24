@@ -36,3 +36,6 @@ utoipa = "5.2.0"
 utoipa-swagger-ui = { version = "8.0.3", features = ["axum"] }
 textnonce = "1.0.0"
 control_plane_logging = { version = "0.1.0" }
+
+[workspace]
+members = ["ar_test"]
