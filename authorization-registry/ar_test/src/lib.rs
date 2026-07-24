@@ -15,7 +15,7 @@
 //! #[async_trait]
 //! impl AuthorizationProvider for MyTestProvider {
 //!     async fn authorize(&self, /* ... */) -> Result<(), MyError> {
-//!         if self.ar.is_permitted(subject, issuer, resource_type, action, identifiers) {
+//!         if self.ar.is_permitted(subject, issuer, resource_type, action, identifiers, None) {
 //!             Ok(())
 //!         } else {
 //!             Err(MyError::Unauthorized)
@@ -27,7 +27,8 @@
 use std::sync::Mutex;
 
 use ishare::delegation_request::{
-    DelegationRequest, DelegationTarget, Policy, PolicySet, Resource, ResourceRules, ResourceTarget,
+    DelegationRequest, DelegationTarget, Environment, Policy, PolicySet, Resource, ResourceRules,
+    ResourceTarget,
 };
 use uuid::Uuid;
 
@@ -120,9 +121,15 @@ impl TestAuthorizationRegistry {
     }
 
     /// Convenience decision check: builds a single-policy delegation request
-    /// (attributes `["*"]`, no environment) and returns true when the stored
-    /// rows yield evidence that permits it. `identifiers: None` matches rows
-    /// regardless of their identifiers.
+    /// (attributes `["*"]`) and returns true when the stored rows yield
+    /// evidence that permits it. `identifiers: None` matches rows regardless
+    /// of their identifiers.
+    ///
+    /// `service_provider: Some(eori)` asks as that service provider (the way
+    /// the ishare PDP client sends its own EORI as the request environment),
+    /// so only rows naming that provider match — there is no wildcard for
+    /// service providers in the matching engine. `None` sends no environment
+    /// and skips service-provider matching entirely.
     pub fn is_permitted(
         &self,
         access_subject: &str,
@@ -130,6 +137,7 @@ impl TestAuthorizationRegistry {
         resource_type: &str,
         action: &str,
         identifiers: Option<Vec<String>>,
+        service_provider: Option<&str>,
     ) -> bool {
         let request = DelegationRequest {
             policy_issuer: policy_issuer.to_owned(),
@@ -145,7 +153,9 @@ impl TestAuthorizationRegistry {
                             attributes: vec!["*".to_owned()],
                         },
                         actions: vec![action.to_owned()],
-                        environment: None,
+                        environment: service_provider.map(|sp| Environment {
+                            service_providers: vec![sp.to_owned()],
+                        }),
                     },
                     rules: vec![ResourceRules {
                         effect: "Permit".to_owned(),
@@ -208,14 +218,28 @@ mod tests {
             "file-1",
         );
 
-        assert!(ar.is_permitted(REQUESTER, OWNER, RESOURCE_TYPE, "Read", ids(&["file-1"])));
+        assert!(ar.is_permitted(
+            REQUESTER,
+            OWNER,
+            RESOURCE_TYPE,
+            "Read",
+            ids(&["file-1"]),
+            None
+        ));
     }
 
     #[test]
     fn no_matching_row_denies_access() {
         let ar = TestAuthorizationRegistry::new();
 
-        assert!(!ar.is_permitted(REQUESTER, OWNER, RESOURCE_TYPE, "Read", ids(&["file-1"])));
+        assert!(!ar.is_permitted(
+            REQUESTER,
+            OWNER,
+            RESOURCE_TYPE,
+            "Read",
+            ids(&["file-1"]),
+            None
+        ));
     }
 
     #[test]
@@ -228,9 +252,30 @@ mod tests {
             "file-1",
         );
 
-        assert!(!ar.is_permitted(REQUESTER, OWNER, RESOURCE_TYPE, "Read", ids(&["file-2"])));
-        assert!(!ar.is_permitted(REQUESTER, OWNER, RESOURCE_TYPE, "Delete", ids(&["file-1"])));
-        assert!(!ar.is_permitted(REQUESTER, OWNER, "Other.Type", "Read", ids(&["file-1"])));
+        assert!(!ar.is_permitted(
+            REQUESTER,
+            OWNER,
+            RESOURCE_TYPE,
+            "Read",
+            ids(&["file-2"]),
+            None
+        ));
+        assert!(!ar.is_permitted(
+            REQUESTER,
+            OWNER,
+            RESOURCE_TYPE,
+            "Delete",
+            ids(&["file-1"]),
+            None
+        ));
+        assert!(!ar.is_permitted(
+            REQUESTER,
+            OWNER,
+            "Other.Type",
+            "Read",
+            ids(&["file-1"]),
+            None
+        ));
     }
 
     #[test]
@@ -243,13 +288,86 @@ mod tests {
             "file-1",
         );
 
-        assert!(!ar.is_permitted(OWNER, REQUESTER, RESOURCE_TYPE, "Read", ids(&["file-1"])));
+        assert!(!ar.is_permitted(
+            OWNER,
+            REQUESTER,
+            RESOURCE_TYPE,
+            "Read",
+            ids(&["file-1"]),
+            None
+        ));
         assert!(!ar.is_permitted(
             "EU.EORI.NLOTHER",
             OWNER,
             RESOURCE_TYPE,
             "Read",
-            ids(&["file-1"])
+            ids(&["file-1"]),
+            None
+        ));
+    }
+
+    #[test]
+    fn service_provider_restriction_is_matched() {
+        const DATASTATION: &str = "EU.EORI.NLDATASTATION";
+
+        let ar = TestAuthorizationRegistry::new();
+        ar.insert_permit(
+            OWNER,
+            REQUESTER,
+            Some(DATASTATION),
+            RESOURCE_TYPE,
+            vec!["Read".to_owned()],
+            Some(vec!["file-1".to_owned()]),
+        );
+
+        // asking as the service provider the permit names
+        assert!(ar.is_permitted(
+            REQUESTER,
+            OWNER,
+            RESOURCE_TYPE,
+            "Read",
+            ids(&["file-1"]),
+            Some(DATASTATION)
+        ));
+        // asking as another service provider
+        assert!(!ar.is_permitted(
+            REQUESTER,
+            OWNER,
+            RESOURCE_TYPE,
+            "Read",
+            ids(&["file-1"]),
+            Some("EU.EORI.NLOTHERSTATION")
+        ));
+        // no environment: service-provider matching is skipped
+        assert!(ar.is_permitted(
+            REQUESTER,
+            OWNER,
+            RESOURCE_TYPE,
+            "Read",
+            ids(&["file-1"]),
+            None
+        ));
+    }
+
+    #[test]
+    fn permit_without_service_provider_denies_environment_requests() {
+        let ar = TestAuthorizationRegistry::new().permit(
+            OWNER,
+            REQUESTER,
+            RESOURCE_TYPE,
+            "Read",
+            "file-1",
+        );
+
+        // rows without service providers can never match a request that
+        // carries an environment -- there is no wildcard for service providers
+        assert!(!ar.is_permitted(
+            REQUESTER,
+            OWNER,
+            RESOURCE_TYPE,
+            "Read",
+            ids(&["file-1"]),
+            Some("EU.EORI.NLDATASTATION")
         ));
     }
 
@@ -265,7 +383,14 @@ mod tests {
             None,
         );
 
-        assert!(ar.is_permitted(REQUESTER, OWNER, RESOURCE_TYPE, "Read", ids(&["anything"])));
+        assert!(ar.is_permitted(
+            REQUESTER,
+            OWNER,
+            RESOURCE_TYPE,
+            "Read",
+            ids(&["anything"]),
+            None
+        ));
     }
 
     #[test]
@@ -280,11 +405,25 @@ mod tests {
             Some(vec!["file-1".to_owned()]),
         );
 
-        assert!(ar.is_permitted(REQUESTER, OWNER, RESOURCE_TYPE, "Read", ids(&["file-1"])));
+        assert!(ar.is_permitted(
+            REQUESTER,
+            OWNER,
+            RESOURCE_TYPE,
+            "Read",
+            ids(&["file-1"]),
+            None
+        ));
 
         ar.remove(&policy_set_id.to_string());
 
-        assert!(!ar.is_permitted(REQUESTER, OWNER, RESOURCE_TYPE, "Read", ids(&["file-1"])));
+        assert!(!ar.is_permitted(
+            REQUESTER,
+            OWNER,
+            RESOURCE_TYPE,
+            "Read",
+            ids(&["file-1"]),
+            None
+        ));
         assert!(ar.rows().is_empty());
     }
 }
