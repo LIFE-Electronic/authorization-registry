@@ -200,8 +200,13 @@ mod tests {
 
     #[test]
     fn permit_grants_access() {
-        let ar = TestAuthorizationRegistry::new()
-            .permit(OWNER, REQUESTER, RESOURCE_TYPE, "Read", "file-1");
+        let ar = TestAuthorizationRegistry::new().permit(
+            OWNER,
+            REQUESTER,
+            RESOURCE_TYPE,
+            "Read",
+            "file-1",
+        );
 
         assert!(ar.is_permitted(REQUESTER, OWNER, RESOURCE_TYPE, "Read", ids(&["file-1"])));
     }
@@ -215,8 +220,13 @@ mod tests {
 
     #[test]
     fn different_identifier_action_or_type_denies_access() {
-        let ar = TestAuthorizationRegistry::new()
-            .permit(OWNER, REQUESTER, RESOURCE_TYPE, "Read", "file-1");
+        let ar = TestAuthorizationRegistry::new().permit(
+            OWNER,
+            REQUESTER,
+            RESOURCE_TYPE,
+            "Read",
+            "file-1",
+        );
 
         assert!(!ar.is_permitted(REQUESTER, OWNER, RESOURCE_TYPE, "Read", ids(&["file-2"])));
         assert!(!ar.is_permitted(REQUESTER, OWNER, RESOURCE_TYPE, "Delete", ids(&["file-1"])));
@@ -225,11 +235,22 @@ mod tests {
 
     #[test]
     fn issuer_and_subject_must_match() {
-        let ar = TestAuthorizationRegistry::new()
-            .permit(OWNER, REQUESTER, RESOURCE_TYPE, "Read", "file-1");
+        let ar = TestAuthorizationRegistry::new().permit(
+            OWNER,
+            REQUESTER,
+            RESOURCE_TYPE,
+            "Read",
+            "file-1",
+        );
 
         assert!(!ar.is_permitted(OWNER, REQUESTER, RESOURCE_TYPE, "Read", ids(&["file-1"])));
-        assert!(!ar.is_permitted("EU.EORI.NLOTHER", OWNER, RESOURCE_TYPE, "Read", ids(&["file-1"])));
+        assert!(!ar.is_permitted(
+            "EU.EORI.NLOTHER",
+            OWNER,
+            RESOURCE_TYPE,
+            "Read",
+            ids(&["file-1"])
+        ));
     }
 
     #[test]

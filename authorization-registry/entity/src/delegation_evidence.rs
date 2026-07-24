@@ -51,7 +51,15 @@ pub struct Policy {
 }
 
 #[derive(
-    Serialize, Deserialize, Clone, FromJsonQueryResult, Debug, PartialEq, Eq, FromQueryResult, ToSchema
+    Serialize,
+    Deserialize,
+    Clone,
+    FromJsonQueryResult,
+    Debug,
+    PartialEq,
+    Eq,
+    FromQueryResult,
+    ToSchema,
 )]
 #[serde(rename_all = "camelCase")]
 pub struct ResourceTarget {
