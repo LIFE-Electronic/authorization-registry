@@ -770,9 +770,9 @@ checksum = "c2459377285ad874054d797f3ccebf984978aa39129f6eafde5cdc8315b612f8"
 
 [[package]]
 name = "control_plane_logging"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "824c6df3fd4e730cc8556bb7207bdf84844d9fe484c30b1f25f8a1cfb96e3d84"
+checksum = "1a61538747f55024bbfb497edacab4fc20815f97df3f00fba999a5c392c04516"
 dependencies = [
  "axum",
  "tower 0.4.13",

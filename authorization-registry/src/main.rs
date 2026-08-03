@@ -203,7 +203,7 @@ async fn main() {
     let args = Args::parse();
     let config = config::read_config(args.config_path);
 
-    control_plane_logging::init_tracing();
+    control_plane_logging::init_tracing(config.log.human_readable);
 
     tracing::info!("Deploy route: {}", config.deploy_route);
 

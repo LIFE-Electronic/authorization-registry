@@ -90,6 +90,7 @@ sea-orm-cli migrate up
   "ishare_ca_path": "$ISHARE_CERTIFICATE_CHAIN",
   "idp_url": "$IDP_URL",
   "idp_eori": "$IDP_EORI",
+  "log": { "human_readable": true },
   "deploy_route": "",
   "frontend": "$FRONTEND" 
 }
