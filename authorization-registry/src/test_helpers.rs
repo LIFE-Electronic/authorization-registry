@@ -191,7 +191,7 @@ pub mod helpers {
 
         fn get_h2m_logout_url(&self, redirect_url: &str) -> anyhow::Result<String> {
             Ok(format!(
-                "http://idp.test/logout?post_logout_redirect_url={redirect_url}"
+                "http://idp.test/logout?post_logout_redirect_uri={redirect_url}&client_id=test"
             ))
         }
 

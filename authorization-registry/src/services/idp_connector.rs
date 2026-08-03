@@ -48,7 +48,8 @@ impl IdpConnector {
 
         logout_url
             .query_pairs_mut()
-            .append_pair("post_logout_redirect_url", redirect_url);
+            .append_pair("post_logout_redirect_uri", redirect_url)
+            .append_pair("client_id", &self.client_id);
 
         Ok(logout_url.to_string())
     }
@@ -171,9 +172,16 @@ mod tests {
         assert_eq!(
             parsed
                 .query_pairs()
-                .find(|(key, _)| key == "post_logout_redirect_url")
+                .find(|(key, _)| key == "post_logout_redirect_uri")
                 .map(|(_, value)| value.into_owned()),
             Some("http://localhost:5173/member?tab=active".to_owned())
+        );
+        assert_eq!(
+            parsed
+                .query_pairs()
+                .find(|(key, _)| key == "client_id")
+                .map(|(_, value)| value.into_owned()),
+            Some("client".to_owned())
         );
     }
 }
