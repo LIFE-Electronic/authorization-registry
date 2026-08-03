@@ -1,10 +1,5 @@
 import { baseAPIUrl } from "./fetch";
 
-export const IDP_URL = new URL(
-  "protocol/openid-connect",
-  import.meta.env.VITE_IDP_URL,
-);
-
 export function initLogin() {
   async function run() {
     try {
@@ -40,6 +35,6 @@ export function initLogin() {
 
 export function initLogout() {
   const redirectUrl = encodeURIComponent(window.location.href);
-  const logoutUrl = `${IDP_URL}/logout?post_logout_redirect_url=${redirectUrl}`;
+  const logoutUrl = `${baseAPIUrl}/connect/human/logout?redirect_uri=${redirectUrl}`;
   window.location.href = logoutUrl;
 }

@@ -23,6 +23,7 @@ pub fn get_connect_routes() -> Router<AppState> {
         .route("/machine/token", post(get_machine_token))
         .route("/human/auth_params", get(get_auth_params))
         .route("/human/auth", get(get_auth).post(post_auth))
+        .route("/human/logout", get(get_logout))
         .route("/human/auth/code", get(get_auth_callback));
 
     return router;
@@ -131,6 +132,22 @@ async fn post_auth(State(app_state): State<AppState>) -> Result<Redirect, AppErr
     let redirect_url = app_state.satellite_provider.get_h2m_redirect_base_url();
 
     return Ok(Redirect::temporary(&redirect_url));
+}
+
+#[derive(Deserialize)]
+struct LogoutQuery {
+    redirect_uri: String,
+}
+
+async fn get_logout(
+    State(app_state): State<AppState>,
+    Query(query): Query<LogoutQuery>,
+) -> Result<Redirect, AppError> {
+    let redirect_url = app_state
+        .satellite_provider
+        .get_h2m_logout_url(&query.redirect_uri)?;
+
+    Ok(Redirect::temporary(&redirect_url))
 }
 
 #[derive(Deserialize)]

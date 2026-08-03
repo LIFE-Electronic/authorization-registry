@@ -188,7 +188,6 @@ npm install
 
 ```
 VITE_BASE_API_URL=http://localhost:4000
-VITE_IDP_URL=$IDP_URL
 ```
 
 Here's a comprehensive table outlining each variable, its description, and an example value:
@@ -196,9 +195,6 @@ Here's a comprehensive table outlining each variable, its description, and an ex
 | Variable Name | Description | Example |
 |--------------|-------------|----------|
 | $VITE_BASE_API_URL | The URL of the AR backend | `http://localhost:4000/api` |
-| $VITE_IDP_URL | URL of the IDP | `https://idp.isharetest.net/realms/ishare_realm/` |
-
-Note: The $VITE_IDP_URL must have a trailing slash.
 
 3. Launch the frontend
 
