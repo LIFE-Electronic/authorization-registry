@@ -3,6 +3,7 @@ use ar_entity::delegation_evidence::Policy;
 
 pub use ar_entity::delegation_evidence::MatchingPolicySetRow;
 use chrono::Utc;
+use sea_orm::sea_query::OnConflict;
 use sea_orm::{self, ConnectionTrait, QueryFilter, TransactionTrait};
 use sea_orm::{entity::*, DatabaseConnection, EntityTrait, FromQueryResult, JsonValue, Statement};
 use serde::{Deserialize, Serialize};
@@ -458,6 +459,55 @@ pub async fn insert_policy_set<C: ConnectionTrait>(
         .last_insert_id;
 
     Ok(policy_set_id)
+}
+
+pub async fn upsert_policy_set<C: ConnectionTrait>(
+    id: Uuid,
+    now: chrono::DateTime<Utc>,
+    target: &AccessSubjectTarget,
+    policy_issuer: &str,
+    licences: &Vec<String>,
+    max_delegation_depth: &i32,
+    db: &C,
+) -> anyhow::Result<()> {
+    let active_policy_set = ar_entity::policy_set::ActiveModel {
+        id: sea_orm::ActiveValue::Set(id),
+        licenses: sea_orm::ActiveValue::Set(licences.clone()),
+        access_subject: sea_orm::ActiveValue::set(target.access_subject.clone()),
+        policy_issuer: sea_orm::ActiveValue::set(policy_issuer.to_owned()),
+        max_delegation_depth: sea_orm::ActiveValue::set(max_delegation_depth.to_owned()),
+        created: sea_orm::ActiveValue::set(now),
+    };
+
+    ar_entity::policy_set::Entity::insert(active_policy_set)
+        .on_conflict(
+            OnConflict::column(ar_entity::policy_set::Column::Id)
+                .update_columns([
+                    ar_entity::policy_set::Column::Licenses,
+                    ar_entity::policy_set::Column::AccessSubject,
+                    ar_entity::policy_set::Column::PolicyIssuer,
+                    ar_entity::policy_set::Column::MaxDelegationDepth,
+                ])
+                .to_owned(),
+        )
+        .exec(db)
+        .await
+        .context("Error upserting policy set")?;
+
+    Ok(())
+}
+
+pub async fn delete_policies_for_policy_set<C: ConnectionTrait>(
+    policy_set_id: Uuid,
+    db: &C,
+) -> anyhow::Result<()> {
+    ar_entity::policy::Entity::delete_many()
+        .filter(ar_entity::policy::Column::PolicySet.eq(policy_set_id))
+        .exec(db)
+        .await
+        .context("Error deleting policies for policy set")?;
+
+    Ok(())
 }
 
 pub async fn insert_policy<C: ConnectionTrait>(

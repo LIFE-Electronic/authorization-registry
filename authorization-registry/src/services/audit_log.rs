@@ -52,6 +52,7 @@ pub enum EditedType {
     PolicyRemoved(PolicyRemoved),
     PolicyAdded(PolicyAdded),
     PolicyReplaced(PolicyReplaced),
+    PolicySetReplaced,
 }
 
 #[derive(Serialize, Deserialize)]
