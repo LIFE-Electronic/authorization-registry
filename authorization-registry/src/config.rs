@@ -21,6 +21,18 @@ fn default_disable_cors_check() -> bool {
     false
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct LogConfig {
+    #[serde(default)]
+    pub human_readable: bool,
+}
+
+fn default_log_config() -> LogConfig {
+    LogConfig {
+        human_readable: false,
+    }
+}
+
 fn default_validate_m2m_certificate() -> bool {
     true
 }
@@ -85,6 +97,8 @@ fn default_service_name() -> String {
 #[derive(Deserialize, Clone, Debug)]
 pub struct Config {
     pub frontend: FrontendConfig,
+    #[serde(default = "default_log_config")]
+    pub log: LogConfig,
     pub client_eori: String,
     pub idp_url: String,
     pub idp_eori: String,
@@ -121,4 +135,19 @@ pub fn read_config(path: String) -> Config {
     let config = serde_json::from_slice(&file_content).expect("unable to parse config");
 
     return config;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{default_disable_cors_check, default_log_config};
+
+    #[test]
+    fn cors_check_remains_enabled_by_default() {
+        assert!(!default_disable_cors_check());
+    }
+
+    #[test]
+    fn structured_logging_remains_the_default() {
+        assert!(!default_log_config().human_readable);
+    }
 }

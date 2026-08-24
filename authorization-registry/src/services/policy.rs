@@ -120,6 +120,95 @@ pub async fn insert_policy_set_with_policies(
     Ok(policy_set_id)
 }
 
+pub async fn put_policy_set_with_policies(
+    now: chrono::DateTime<chrono::Utc>,
+    policy_set_id: Uuid,
+    requester_company_id: &str,
+    args: &InsertPolicySetWithPolicies,
+    db: &DatabaseConnection,
+    client_eori: &str,
+    time_provider: std::sync::Arc<dyn TimeProvider>,
+    ishare: std::sync::Arc<dyn SatelliteProvider>,
+) -> Result<bool, AppError> {
+    validate_policy_set_ishare_parties(now, args, ishare).await?;
+
+    let existing = policy_store::get_policy_set_by_id(&policy_set_id, db)
+        .await
+        .context("Error checking whether policy set exists")?;
+    let existed = existing.is_some();
+
+    // when the id is taken, authorize against the stored policy set, not the request body
+    let access = match &existing {
+        Some(stored) => {
+            if stored.policy_issuer != args.policy_issuer {
+                return Err(AppError::Expected(ExpectedError {
+                    status_code: StatusCode::CONFLICT,
+                    message: "policy set id is already in use by a different policy issuer"
+                        .to_owned(),
+                    reason: format!(
+                        "policy set '{}' is issued by '{}'",
+                        policy_set_id, stored.policy_issuer
+                    ),
+                    metadata: None,
+                }));
+            }
+
+            let stored_policies = policy_store::get_policies_by_policy_set(&policy_set_id, db)
+                .await
+                .context("Error getting policies for stored policy set")?;
+            let resource_types = stored_policies
+                .iter()
+                .map(|policy| policy.resource_type.clone())
+                .collect();
+
+            verify_policy_set_access(
+                requester_company_id,
+                &PolicySetAction::Edit,
+                &stored.policy_issuer,
+                &stored.access_subject,
+                resource_types,
+                client_eori,
+                time_provider,
+                db,
+            )
+            .await
+        }
+        None => {
+            let resource_types = args
+                .policies
+                .iter()
+                .map(|policy| policy.target.resource.resource_type.clone())
+                .collect();
+
+            verify_policy_set_access(
+                requester_company_id,
+                &PolicySetAction::Create,
+                &args.policy_issuer,
+                &args.target.access_subject,
+                resource_types,
+                client_eori,
+                time_provider,
+                db,
+            )
+            .await
+        }
+    }
+    .context("Error verifying access to put policy set")?;
+
+    if !access {
+        return Err(AppError::Expected(ExpectedError {
+            status_code: StatusCode::FORBIDDEN,
+            message: "not allowed to put policy set".to_owned(),
+            reason: "not allowed to put policy set".to_owned(),
+            metadata: None,
+        }));
+    }
+
+    replace_policy_set_with_policies_in_db(now, policy_set_id, args, existed, db).await?;
+
+    Ok(existed)
+}
+
 #[derive(Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct InsertPolicySetWithPolicies {
@@ -173,6 +262,60 @@ pub async fn insert_policy_set_with_policies_into_db(
         .context("Error commiting transaction to db")?;
 
     Ok(policy_set_id)
+}
+
+async fn replace_policy_set_with_policies_in_db(
+    now: chrono::DateTime<Utc>,
+    policy_set_id: Uuid,
+    args: &InsertPolicySetWithPolicies,
+    existed: bool,
+    db: &DatabaseConnection,
+) -> anyhow::Result<()> {
+    let transaction = db.begin().await.context("Error opening db transaction")?;
+
+    policy_store::upsert_policy_set(
+        policy_set_id,
+        now,
+        &args.target,
+        &args.policy_issuer,
+        &args.licences,
+        &args.max_delegation_depth,
+        &transaction,
+    )
+    .await?;
+    policy_store::delete_policies_for_policy_set(policy_set_id, &transaction).await?;
+
+    for policy in &args.policies {
+        policy_store::insert_policy(policy_set_id, policy, &transaction).await?;
+    }
+
+    let event_type = if existed {
+        super::audit_log::EventType::ArPolicySetEdited(PolicySetEditedEventMetadata {
+            policy_set_id,
+            edited_type: super::audit_log::EditedType::PolicySetReplaced,
+        })
+    } else {
+        super::audit_log::EventType::ArPolicySetCreated(PolicySetCreatedEventMetadata {
+            policy_set_id,
+        })
+    };
+    log_event(
+        now,
+        policy_set_id.to_string(),
+        event_type,
+        None,
+        None,
+        &transaction,
+    )
+    .await
+    .context("Error logging policy set PUT")?;
+
+    transaction
+        .commit()
+        .await
+        .context("Error committing policy set replacement")?;
+
+    Ok(())
 }
 
 pub async fn insert_policy_set_with_policies_admin(

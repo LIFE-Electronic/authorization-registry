@@ -85,6 +85,7 @@ Admin routes provide additional capabilities for managing policies across all pa
         routes::policy_set::get_all_policy_sets,
         routes::policy_set::get_policy_set,
         routes::policy_set::insert_policy_set,
+        routes::policy_set::put_policy_set,
         routes::policy_set::delete_policy_set,
         routes::policy_set::add_policy_to_policy_set,
         routes::policy_set::delete_policy_from_policy_set,
@@ -203,7 +204,7 @@ async fn main() {
     let args = Args::parse();
     let config = config::read_config(args.config_path);
 
-    control_plane_logging::init_tracing();
+    control_plane_logging::init_tracing(config.log.human_readable);
 
     tracing::info!("Deploy route: {}", config.deploy_route);
 

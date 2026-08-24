@@ -55,6 +55,8 @@ pub trait SatelliteProvider: Send + Sync {
 
     fn get_h2m_redirect_base_url(&self) -> String;
 
+    fn get_h2m_logout_url(&self, redirect_url: &str) -> anyhow::Result<String>;
+
     async fn get_h2m_redirect_form(
         &self,
         server_url: &str,
@@ -226,6 +228,10 @@ impl SatelliteProvider for ISHAREProvider {
 
     fn get_h2m_redirect_base_url(&self) -> String {
         return self.idp_connector.get_realm_url();
+    }
+
+    fn get_h2m_logout_url(&self, redirect_url: &str) -> anyhow::Result<String> {
+        self.idp_connector.get_logout_url(redirect_url)
     }
 
     async fn get_h2m_redirect_form(

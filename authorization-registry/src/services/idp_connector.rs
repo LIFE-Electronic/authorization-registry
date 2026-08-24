@@ -36,12 +36,26 @@ impl IdpConnector {
     }
 
     pub fn get_realm_url(&self) -> String {
-        let idp_url = self.idp_url.clone();
+        let idp_url = self.idp_url.trim_end_matches('/');
         return format!("{idp_url}/protocol/openid-connect/auth");
     }
 
+    pub fn get_logout_url(&self, redirect_url: &str) -> anyhow::Result<String> {
+        let idp_url = self.idp_url.trim_end_matches('/');
+        let mut logout_url =
+            reqwest::Url::parse(&format!("{idp_url}/protocol/openid-connect/logout"))
+                .context("invalid IDP URL")?;
+
+        logout_url
+            .query_pairs_mut()
+            .append_pair("post_logout_redirect_uri", redirect_url)
+            .append_pair("client_id", &self.client_id);
+
+        Ok(logout_url.to_string())
+    }
+
     pub fn generate_auth_url(&self, client_assertion: &str, state: &str) -> String {
-        let idp_url = self.idp_url.clone();
+        let idp_url = self.idp_url.trim_end_matches('/');
         let client_id = self.client_id.clone();
         let encoded_state = urlencoding::encode(state);
         let url = format!("{idp_url}/protocol/openid-connect/auth?response_type=code&scope=openid+iSHARE&client_id={client_id}&request={client_assertion}&state={encoded_state}");
@@ -90,7 +104,7 @@ impl IdpConnector {
         code: &str,
         client_assertion: &str,
     ) -> anyhow::Result<TokenResponse> {
-        let idp_url = self.idp_url.clone();
+        let idp_url = self.idp_url.trim_end_matches('/');
 
         let redirect_uri = self.get_redirect_uri(server_base_url);
 
@@ -124,5 +138,50 @@ impl IdpConnector {
             .context("Error decoding token response")?;
 
         return Ok(token_response);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::IdpConnector;
+
+    fn connector(idp_url: &str) -> IdpConnector {
+        IdpConnector::new(idp_url.to_owned(), "client".to_owned(), "idp".to_owned())
+    }
+
+    #[test]
+    fn realm_url_does_not_contain_a_double_slash_in_the_path() {
+        let connector = connector("https://idp.example/realms/dmi/");
+
+        assert_eq!(
+            connector.get_realm_url(),
+            "https://idp.example/realms/dmi/protocol/openid-connect/auth"
+        );
+    }
+
+    #[test]
+    fn logout_url_is_derived_from_backend_idp_config() {
+        let connector = connector("https://idp.example/realms/dmi/");
+
+        let logout_url = connector
+            .get_logout_url("http://localhost:5173/member?tab=active")
+            .unwrap();
+        let parsed = reqwest::Url::parse(&logout_url).unwrap();
+
+        assert_eq!(parsed.path(), "/realms/dmi/protocol/openid-connect/logout");
+        assert_eq!(
+            parsed
+                .query_pairs()
+                .find(|(key, _)| key == "post_logout_redirect_uri")
+                .map(|(_, value)| value.into_owned()),
+            Some("http://localhost:5173/member?tab=active".to_owned())
+        );
+        assert_eq!(
+            parsed
+                .query_pairs()
+                .find(|(key, _)| key == "client_id")
+                .map(|(_, value)| value.into_owned()),
+            Some("client".to_owned())
+        );
     }
 }

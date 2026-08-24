@@ -47,6 +47,14 @@ pub struct TestAuthorizationRegistry {
     rows: Mutex<Vec<MatchingPolicySetRow>>,
 }
 
+/// Errors mirroring the AR's rejections of `PUT /policy-set/{id}`.
+#[derive(Debug, PartialEq, Eq)]
+pub enum PutPermitError {
+    /// The AR's `409 Conflict`: the id is already in use by a different
+    /// policy issuer.
+    PolicyIssuerConflict { stored_policy_issuer: String },
+}
+
 impl TestAuthorizationRegistry {
     pub fn new() -> Self {
         Self::default()
@@ -106,6 +114,54 @@ impl TestAuthorizationRegistry {
             }],
         });
         policy_set_id
+    }
+
+    /// Create or replace a permit policy set at a caller-supplied id,
+    /// mirroring `PUT /policy-set/{id}`. Returns `Ok(true)` when an existing
+    /// policy set was replaced and `Ok(false)` when a new one was created.
+    /// Like the AR's 409, replacing is refused with
+    /// [`PutPermitError::PolicyIssuerConflict`] when the id is already in use
+    /// by a different policy issuer.
+    pub fn put_permit(
+        &self,
+        policy_set_id: Uuid,
+        policy_issuer: &str,
+        access_subject: &str,
+        service_provider: Option<&str>,
+        resource_type: &str,
+        actions: Vec<String>,
+        identifiers: Option<Vec<String>>,
+    ) -> Result<bool, PutPermitError> {
+        let mut rows = self.rows.lock().unwrap();
+        let existed = match rows.iter().find(|row| row.policy_set_id == policy_set_id) {
+            Some(stored) if stored.policy_issuer != policy_issuer => {
+                return Err(PutPermitError::PolicyIssuerConflict {
+                    stored_policy_issuer: stored.policy_issuer.clone(),
+                });
+            }
+            Some(_) => true,
+            None => false,
+        };
+        rows.retain(|row| row.policy_set_id != policy_set_id);
+        rows.push(MatchingPolicySetRow {
+            policy_set_id,
+            access_subject: access_subject.to_owned(),
+            policy_issuer: policy_issuer.to_owned(),
+            licenses: vec![],
+            max_delegation_depth: 0,
+            policies: vec![DelegationEvidencePolicy {
+                id: Uuid::new_v4(),
+                identifiers: identifiers.unwrap_or_else(|| vec!["*".to_owned()]),
+                resource_type: resource_type.to_owned(),
+                attributes: vec!["*".to_owned()],
+                actions,
+                service_providers: service_provider
+                    .map(|provider| vec![provider.to_owned()])
+                    .unwrap_or_default(),
+                rules: vec![ResourceRule::Permit],
+            }],
+        });
+        Ok(existed)
     }
 
     /// Remove the policy set with the given id, mirroring policy-set deletion.
@@ -425,5 +481,118 @@ mod tests {
             None
         ));
         assert!(ar.rows().is_empty());
+    }
+
+    #[test]
+    fn put_permit_creates_replaces_and_repeats_at_the_supplied_id() {
+        let ar = TestAuthorizationRegistry::new();
+        let policy_set_id = Uuid::new_v4();
+
+        assert!(!ar
+            .put_permit(
+                policy_set_id,
+                OWNER,
+                REQUESTER,
+                None,
+                RESOURCE_TYPE,
+                vec!["Read".to_owned()],
+                ids(&["file-1"]),
+            )
+            .unwrap());
+        assert!(ar.is_permitted(
+            REQUESTER,
+            OWNER,
+            RESOURCE_TYPE,
+            "Read",
+            ids(&["file-1"]),
+            None,
+        ));
+
+        assert!(ar
+            .put_permit(
+                policy_set_id,
+                OWNER,
+                REQUESTER,
+                None,
+                RESOURCE_TYPE,
+                vec!["Delete".to_owned()],
+                ids(&["file-2"]),
+            )
+            .unwrap());
+        assert!(!ar.is_permitted(
+            REQUESTER,
+            OWNER,
+            RESOURCE_TYPE,
+            "Read",
+            ids(&["file-1"]),
+            None,
+        ));
+        assert!(ar.is_permitted(
+            REQUESTER,
+            OWNER,
+            RESOURCE_TYPE,
+            "Delete",
+            ids(&["file-2"]),
+            None,
+        ));
+
+        assert!(ar
+            .put_permit(
+                policy_set_id,
+                OWNER,
+                REQUESTER,
+                None,
+                RESOURCE_TYPE,
+                vec!["Delete".to_owned()],
+                ids(&["file-2"]),
+            )
+            .unwrap());
+        assert_eq!(ar.rows().len(), 1);
+        assert_eq!(ar.rows()[0].policy_set_id, policy_set_id);
+    }
+
+    #[test]
+    fn put_permit_rejects_an_id_held_by_a_different_policy_issuer() {
+        let ar = TestAuthorizationRegistry::new();
+        let policy_set_id = Uuid::new_v4();
+        ar.put_permit(
+            policy_set_id,
+            OWNER,
+            REQUESTER,
+            None,
+            RESOURCE_TYPE,
+            vec!["Read".to_owned()],
+            ids(&["file-1"]),
+        )
+        .unwrap();
+
+        let conflict = ar
+            .put_permit(
+                policy_set_id,
+                "EU.EORI.NLATTACKER",
+                "EU.EORI.NLATTACKER",
+                None,
+                RESOURCE_TYPE,
+                vec!["Read".to_owned()],
+                ids(&["file-1"]),
+            )
+            .unwrap_err();
+        assert_eq!(
+            conflict,
+            PutPermitError::PolicyIssuerConflict {
+                stored_policy_issuer: OWNER.to_owned()
+            }
+        );
+
+        assert_eq!(ar.rows().len(), 1);
+        assert_eq!(ar.rows()[0].policy_issuer, OWNER);
+        assert!(ar.is_permitted(
+            REQUESTER,
+            OWNER,
+            RESOURCE_TYPE,
+            "Read",
+            ids(&["file-1"]),
+            None,
+        ));
     }
 }
