@@ -5,9 +5,7 @@ use axum::{
     routing::get,
     Json, Router,
 };
-use ishare::ishare::{
-    Capabilities, CapabilitiesInfo, Role, SupportedFeature, SupportedFeatures, SupportedVersion,
-};
+use ishare::v3::{Capabilities, CapabilitiesInfo, Service, ServiceVersion};
 use reqwest::StatusCode;
 use serde::Serialize;
 
@@ -21,64 +19,91 @@ pub fn get_capabilities_routes() -> Router<AppState> {
     return Router::new().route("/", get(get_capabilities));
 }
 
-pub fn create_capabilities(party_id: &str, api_url: &str, show_private: bool) -> Capabilities {
-    let mut supported_features: Vec<SupportedFeatures> = vec![SupportedFeatures::Public(vec![
-        SupportedFeature {
-            id: "ebb696ab-bda7-44a9-8cec-382183d58d9d".to_owned(),
-            feature: "access token".to_owned(),
-            url: format!("{}{}", api_url, "/connect/machine/token"),
-            description: "retrieve machine access token for M2M authentication".to_owned(),
-            token_endpoint: None,
+fn service(
+    identifier: &str,
+    title: &str,
+    description: &str,
+    endpoint_url: String,
+    token_endpoint: Option<String>,
+    service_type: &str,
+) -> Service {
+    Service {
+        identifier: identifier.to_owned(),
+        title: title.to_owned(),
+        description: Some(description.to_owned()),
+        endpoint_description: None,
+        endpoint_url,
+        token_endpoint,
+        status: "active".to_owned(),
+        service_type: service_type.to_owned(),
+        version: ServiceVersion {
+            complies_with_framework_versions: Some(vec!["3.0".to_owned()]),
+            complies_with_dataspace_versions: None,
+            capability_version: "1.0".to_owned(),
         },
-        SupportedFeature {
-            id: "ebb696ab-bda7-44a9-8cec-382183d58d9d".to_owned(),
-            feature: "human access token".to_owned(),
-            url: format!("{}{}", api_url, "/connect/machine/token"),
-            description: "retrieve human access token for H2M authentication".to_owned(),
-            token_endpoint: None,
-        },
-        SupportedFeature {
-            id: "d7d27d71-2755-4eea-bb97-bfa5ce8addef".to_owned(),
-            feature: "capabilities".to_owned(),
-            url: format!("{}/capabilities", api_url),
-            description: "retrieve capabilities".to_owned(),
-            token_endpoint: Some(format!("{}/connect/machine/token", api_url)),
-        },
-        SupportedFeature {
-            id: "igds-auditlog".to_owned(),
-            feature: "igds-auditlog".to_owned(),
-            token_endpoint: Some(format!("{}/connect/machine/token", api_url)),
-            url: format!("{}/audit-log", api_url),
-            description: "InformationGrid DataSharing auditlog".to_string(),
-        },
-    ])];
-
-    if show_private {
-        supported_features.push(SupportedFeatures::Restricted(vec![SupportedFeature {
-            id: "aaf5162b-82f2-4bf2-9eaa-e01b380e7ec3".to_owned(),
-            url: format!("{}{}", api_url, "/delegation"),
-            feature: "iSHARE delegation request".to_owned(),
-            description: "issue iSHARE delegation evidence based on your delegation request"
-                .to_owned(),
-            token_endpoint: Some(format!("{}{}", api_url, "/connect/machine/token")),
-        }]));
+        methods: None,
+        auth_registry: None,
     }
+}
+
+pub fn create_capabilities(api_url: &str, show_private: bool) -> Capabilities {
+    let token_endpoint = format!("{}/connect/machine/token", api_url);
+    let public_services = vec![
+        service(
+            "request-oauth-token",
+            "access token",
+            "retrieve machine access token for M2M authentication",
+            token_endpoint.clone(),
+            None,
+            "framework-defined",
+        ),
+        service(
+            "human-access-token",
+            "human access token",
+            "retrieve human access token for H2M authentication",
+            format!("{}/connect/human/auth", api_url),
+            None,
+            "self-defined",
+        ),
+        service(
+            "get-capabilities-token",
+            "capabilities",
+            "retrieve capabilities",
+            format!("{}/capabilities", api_url),
+            Some(token_endpoint.clone()),
+            "framework-defined",
+        ),
+        service(
+            "igds-auditlog",
+            "igds-auditlog",
+            "InformationGrid DataSharing auditlog",
+            format!("{}/audit-log", api_url),
+            Some(token_endpoint.clone()),
+            "self-defined",
+        ),
+    ];
+
+    let restricted_services = show_private.then(|| {
+        vec![service(
+            "request-delegation-evidence",
+            "iSHARE delegation request",
+            "issue iSHARE delegation evidence based on your delegation request",
+            format!("{}/delegation", api_url),
+            Some(token_endpoint.clone()),
+            "framework-defined",
+        )]
+    });
 
     return Capabilities {
         capabilities_info: CapabilitiesInfo {
-            party_id: party_id.to_owned(),
-            ishare_roles: vec![Role {
-                role: "AuthorizationRegistry".to_owned(),
-            }],
-            supported_versions: vec![SupportedVersion {
-                version: "1.7".to_owned(),
-                supported_features,
-            }],
+            public_services,
+            restricted_services,
         },
     };
 }
 
 #[derive(Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 struct CapabilitiesResponse {
     capabilities_token: String,
 }
@@ -149,7 +174,7 @@ async fn get_capabilities(
     };
 
     let api_url = [scheme, host, app_state.config.deploy_route.clone()].join("");
-    let capabilities = create_capabilities(&app_state.config.client_eori, &api_url, show_private);
+    let capabilities = create_capabilities(&api_url, show_private);
 
     let capabilities_token = app_state
         .satellite_provider
@@ -167,10 +192,25 @@ mod test {
         http::{Request, StatusCode},
     };
 
+    use http_body_util::BodyExt;
     use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
     use tower::ServiceExt;
 
     use super::super::super::test_helpers::helpers::*;
+
+    #[test]
+    fn human_access_token_points_to_human_auth() {
+        let capabilities = super::create_capabilities("http://ar", false);
+
+        let human = capabilities
+            .capabilities_info
+            .public_services
+            .iter()
+            .find(|s| s.identifier == "human-access-token")
+            .unwrap();
+
+        assert_eq!(human.endpoint_url, "http://ar/connect/human/auth");
+    }
 
     #[sqlx::test]
     async fn auth_header_not_bearer_plus_value(
@@ -217,6 +257,15 @@ mod test {
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
+
+        let body: serde_json::Value =
+            serde_json::from_slice(&response.into_body().collect().await.unwrap().to_bytes())
+                .unwrap();
+
+        assert_eq!(
+            body,
+            serde_json::json!({ "capabilitiesToken": "capabilities token" })
+        );
 
         Ok(())
     }
