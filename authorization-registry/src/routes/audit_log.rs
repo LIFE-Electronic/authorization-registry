@@ -78,7 +78,7 @@ mod tests {
     use axum::body::Body;
     use axum::http::{Request, StatusCode};
     use http_body_util::BodyExt;
-    use ishare::delegation_request::{DelegationRequest, DelegationTarget};
+    use ishare::v3::delegation_request::{DelegationRequest, DelegationTarget};
     use reqwest::header::AUTHORIZATION;
     use serde_json::json;
     use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
@@ -98,6 +98,8 @@ mod tests {
                     .to_utc(),
                 "".to_owned(),
                 crate::services::audit_log::EventType::DmiDelegationRequest(DelegationRequest {
+                    delegation_path: None,
+                    previous_steps: None,
                     policy_issuer: "pi".to_owned(),
                     target: DelegationTarget {
                         access_subject: "as".to_owned(),
@@ -263,6 +265,8 @@ mod tests {
                 .to_utc(),
             "".to_owned(),
             crate::services::audit_log::EventType::DmiDelegationRequest(DelegationRequest {
+                delegation_path: None,
+                previous_steps: None,
                 policy_issuer: "pi".to_owned(),
                 target: DelegationTarget {
                     access_subject: "as".to_owned(),
@@ -282,6 +286,8 @@ mod tests {
                 .to_utc(),
             "".to_owned(),
             crate::services::audit_log::EventType::DmiDelegationRequest(DelegationRequest {
+                delegation_path: None,
+                previous_steps: None,
                 policy_issuer: "pi".to_owned(),
                 target: DelegationTarget {
                     access_subject: "as".to_owned(),
@@ -343,6 +349,8 @@ mod tests {
                 .to_utc(),
             "".to_owned(),
             crate::services::audit_log::EventType::DmiDelegationRequest(DelegationRequest {
+                delegation_path: None,
+                previous_steps: None,
                 policy_issuer: "pi".to_owned(),
                 target: DelegationTarget {
                     access_subject: "as".to_owned(),
@@ -362,6 +370,8 @@ mod tests {
                 .to_utc(),
             "".to_owned(),
             crate::services::audit_log::EventType::DmiDelegationRequest(DelegationRequest {
+                delegation_path: None,
+                previous_steps: None,
                 policy_issuer: "pi".to_owned(),
                 target: DelegationTarget {
                     access_subject: "as".to_owned(),
@@ -381,6 +391,8 @@ mod tests {
                 .to_utc(),
             "".to_owned(),
             crate::services::audit_log::EventType::DmiDelegationRequest(DelegationRequest {
+                delegation_path: None,
+                previous_steps: None,
                 policy_issuer: "pi".to_owned(),
                 target: DelegationTarget {
                     access_subject: "as".to_owned(),
@@ -441,6 +453,8 @@ mod tests {
                 .to_utc(),
             "".to_owned(),
             crate::services::audit_log::EventType::DmiDelegationRequest(DelegationRequest {
+                delegation_path: None,
+                previous_steps: None,
                 policy_issuer: "pi".to_owned(),
                 target: DelegationTarget {
                     access_subject: "as".to_owned(),
@@ -501,6 +515,8 @@ mod tests {
                 .to_utc(),
             "".to_owned(),
             crate::services::audit_log::EventType::DmiDelegationRequest(DelegationRequest {
+                delegation_path: None,
+                previous_steps: None,
                 policy_issuer: "pi".to_owned(),
                 target: DelegationTarget {
                     access_subject: "as".to_owned(),
@@ -563,6 +579,8 @@ mod tests {
                 .to_utc(),
             "".to_owned(),
             crate::services::audit_log::EventType::DmiDelegationRequest(DelegationRequest {
+                delegation_path: None,
+                previous_steps: None,
                 policy_issuer: "pi".to_owned(),
                 target: DelegationTarget {
                     access_subject: "as".to_owned(),
@@ -582,6 +600,8 @@ mod tests {
                 .to_utc(),
             "".to_owned(),
             crate::services::audit_log::EventType::DmiDelegationRequest(DelegationRequest {
+                delegation_path: None,
+                previous_steps: None,
                 policy_issuer: "pi".to_owned(),
                 target: DelegationTarget {
                     access_subject: "as".to_owned(),
@@ -657,8 +677,8 @@ mod tests {
                                         "attributes": ["zingers"]
                                     },
                                     "actions": ["Read", "Delete"],
-                                    "environment": {
-                                        "serviceProviders": ["good-company"]
+                                    "context": {
+                                        "serviceProvider": "good-company"
                                     }
                                 },
                                 "rules": [

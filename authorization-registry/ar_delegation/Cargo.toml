@@ -5,4 +5,4 @@ edition = "2021"
 
 [dependencies]
 ar_entity = { path = "../entity" }
-ishare = "0.11.1"
+ishare = "0.12.0"
