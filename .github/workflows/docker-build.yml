@@ -1,4 +1,4 @@
-name: Backend container build
+name: Container builds
 
 on:
   pull_request:
@@ -20,10 +20,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build image
-        run: docker build -t authorization-registry:ci .
+        run: docker build -t ar:ci .
       - name: Check executable starts
-        run: docker run --rm --network none authorization-registry:ci --help
-      - name: Publish image
+        run: docker run --rm --network none ar:ci --help
+      - name: Build UI image
+        run: docker build -t ar-ui:ci ./ar-frontend
+      - name: Check UI server configuration
+        run: docker run --rm --network none ar-ui:ci nginx -t
+      - name: Publish images
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           REGISTRY_HOST: ${{ secrets.REGISTRY_HOST }}
@@ -34,8 +38,10 @@ jobs:
           : "${REGISTRY_USERNAME:?Set the REGISTRY_USERNAME repository secret}"
           : "${REGISTRY_PASSWORD:?Set the REGISTRY_PASSWORD repository secret}"
           printf '%s' "$REGISTRY_PASSWORD" | docker login "$REGISTRY_HOST" --username "$REGISTRY_USERNAME" --password-stdin
-          IMAGE="$REGISTRY_HOST/ar:$GITHUB_SHA"
-          docker tag authorization-registry:ci "$IMAGE"
-          docker push "$IMAGE"
-          docker tag authorization-registry:ci "$REGISTRY_HOST/ar:latest"
-          docker push "$REGISTRY_HOST/ar:latest"
+          for SERVICE in ar ar-ui; do
+            IMAGE="$REGISTRY_HOST/$SERVICE"
+            docker tag "$SERVICE:ci" "$IMAGE:$GITHUB_SHA"
+            docker push "$IMAGE:$GITHUB_SHA"
+            docker tag "$SERVICE:ci" "$IMAGE:latest"
+            docker push "$IMAGE:latest"
+          done
