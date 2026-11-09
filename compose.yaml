@@ -1,0 +1,19 @@
+services:
+  ar:
+    image: ${AR_IMAGE:-authorization-registry:local}
+    build: .
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:4000:4000"
+    volumes:
+      - type: bind
+        source: ${AR_CONFIG_DIR:?Set AR_CONFIG_DIR to your configuration directory}
+        target: /etc/ar
+        read_only: true
+        bind:
+          create_host_path: false
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
