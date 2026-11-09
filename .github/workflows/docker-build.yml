@@ -13,23 +13,23 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      IMAGE: ${{ vars.REGISTRY_HOST || 'localhost' }}/ar:${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
       - name: Build image
-        run: docker build -t "$IMAGE" .
+        run: docker build -t authorization-registry:ci .
       - name: Check executable starts
-        run: docker run --rm --network none "$IMAGE" --help
+        run: docker run --rm --network none authorization-registry:ci --help
       - name: Publish image
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
-          REGISTRY_HOST: ${{ vars.REGISTRY_HOST }}
+          REGISTRY_HOST: ${{ secrets.REGISTRY_HOST }}
           REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
           REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
         run: |
-          : "${REGISTRY_HOST:?Set the REGISTRY_HOST repository variable}"
+          : "${REGISTRY_HOST:?Set the REGISTRY_HOST repository secret}"
           : "${REGISTRY_USERNAME:?Set the REGISTRY_USERNAME repository secret}"
           : "${REGISTRY_PASSWORD:?Set the REGISTRY_PASSWORD repository secret}"
           printf '%s' "$REGISTRY_PASSWORD" | docker login "$REGISTRY_HOST" --username "$REGISTRY_USERNAME" --password-stdin
+          IMAGE="$REGISTRY_HOST/ar:$GITHUB_SHA"
+          docker tag authorization-registry:ci "$IMAGE"
           docker push "$IMAGE"
