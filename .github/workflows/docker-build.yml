@@ -7,6 +7,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -33,3 +37,5 @@ jobs:
           IMAGE="$REGISTRY_HOST/ar:$GITHUB_SHA"
           docker tag authorization-registry:ci "$IMAGE"
           docker push "$IMAGE"
+          docker tag authorization-registry:ci "$REGISTRY_HOST/ar:latest"
+          docker push "$REGISTRY_HOST/ar:latest"
