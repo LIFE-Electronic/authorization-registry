@@ -1,0 +1,9 @@
+# Allow only backend Rust sources and Cargo manifests into the build.
+**
+!authorization-registry/
+!authorization-registry/**/
+!authorization-registry/**/Cargo.toml
+!authorization-registry/Cargo.lock
+!authorization-registry/**/*.rs
+# Never include local build artifacts.
+**/target/
