@@ -38,10 +38,13 @@ jobs:
           : "${REGISTRY_USERNAME:?Set the REGISTRY_USERNAME repository secret}"
           : "${REGISTRY_PASSWORD:?Set the REGISTRY_PASSWORD repository secret}"
           printf '%s' "$REGISTRY_PASSWORD" | docker login "$REGISTRY_HOST" --username "$REGISTRY_USERNAME" --password-stdin
-          for SERVICE in ar ar-ui; do
-            IMAGE="$REGISTRY_HOST/$SERVICE"
-            docker tag "$SERVICE:ci" "$IMAGE:$GITHUB_SHA"
-            docker push "$IMAGE:$GITHUB_SHA"
-            docker tag "$SERVICE:ci" "$IMAGE:latest"
-            docker push "$IMAGE:latest"
-          done
+
+          docker tag ar:ci "$REGISTRY_HOST/ar:$GITHUB_SHA"
+          docker push "$REGISTRY_HOST/ar:$GITHUB_SHA"
+          docker tag ar:ci "$REGISTRY_HOST/ar:latest"
+          docker push "$REGISTRY_HOST/ar:latest"
+
+          docker tag ar-ui:ci "$REGISTRY_HOST/ar-ui:$GITHUB_SHA"
+          docker push "$REGISTRY_HOST/ar-ui:$GITHUB_SHA"
+          docker tag ar-ui:ci "$REGISTRY_HOST/ar-ui:latest"
+          docker push "$REGISTRY_HOST/ar-ui:latest"
