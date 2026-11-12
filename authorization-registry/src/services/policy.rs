@@ -1,8 +1,8 @@
 use anyhow::Context;
 use ar_entity::delegation_evidence::ResourceRule;
 use chrono::Utc;
-use ishare::delegation_evidence::verify_delegation_evidence;
-use ishare::delegation_request::{DelegationRequest, DelegationTarget, ResourceTarget};
+use ishare::v3::delegation_evidence::verify_delegation_evidence;
+use ishare::v3::delegation_request::{DelegationRequest, DelegationTarget, ResourceTarget};
 use reqwest::StatusCode;
 use sea_orm::{DatabaseConnection, TransactionTrait};
 use serde::Deserialize;
@@ -378,24 +378,26 @@ pub async fn verify_policy_set_access(
     }
 
     let delegation_request = DelegationRequest {
+        delegation_path: None,
+        previous_steps: None,
         policy_issuer: policy_issuer.to_string(),
         target: DelegationTarget {
             access_subject: requestor_company_id.to_string(),
         },
-        policy_sets: vec![ishare::delegation_request::PolicySet {
-            policies: vec![ishare::delegation_request::Policy {
+        policy_sets: vec![ishare::v3::delegation_request::PolicySet {
+            policies: vec![ishare::v3::delegation_request::Policy {
                 target: ResourceTarget {
                     actions: vec![action.to_string()],
-                    resource: ishare::delegation_request::Resource {
+                    resource: ishare::v3::delegation_request::Resource {
                         identifiers: resource_types.clone(),
                         resource_type: "PDP.Policy".to_string(),
                         attributes: vec!["*".to_string()],
                     },
-                    environment: Some(ishare::delegation_request::Environment {
-                        service_providers: vec![client_eori.to_string()],
+                    context: Some(ishare::v3::delegation_request::Context {
+                        service_provider: Some(client_eori.to_string()),
                     }),
                 },
-                rules: vec![ishare::delegation_request::ResourceRules {
+                rules: vec![ishare::v3::delegation_request::ResourceRules {
                     effect: "Permit".to_string(),
                 }],
             }],

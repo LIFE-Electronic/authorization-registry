@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
 use anyhow::Context;
-use ishare::delegation_evidence::{
+use ishare::v3::delegation_evidence::{
     DelegationEvidence, DelegationEvidenceContainer, DelegationTarget,
 };
-use ishare::delegation_request::DelegationRequest;
+use ishare::v3::delegation_request::DelegationRequest;
 use sea_orm::DatabaseConnection;
 
 use crate::db::policy::{self as policy_store};
@@ -41,9 +41,8 @@ pub fn check_delegation_access(
         let service_providers: Vec<String> = delegation_request
             .policy_sets
             .iter()
-            .flat_map(|ps| ps.policies.iter().map(|p| p.target.environment.clone()))
-            .filter_map(|x| x)
-            .flat_map(|x| x.service_providers)
+            .flat_map(|ps| ps.policies.iter().map(|p| p.target.context.clone()))
+            .filter_map(|x| x.and_then(|c| c.service_provider))
             .collect();
 
         // grant access if at least 1 service provider - only the same service provider is used - and that service provider is the requestor
@@ -119,8 +118,8 @@ pub async fn create_delegation_evidence(
 #[cfg(test)]
 mod tests {
     use ar_entity::delegation_evidence::{Deny, Resource, ResourceRule, Target};
-    use ishare::delegation_request::{
-        DelegationTarget, Environment, Policy, PolicySet, Resource as DRResource, ResourceRules,
+    use ishare::v3::delegation_request::{
+        Context, DelegationTarget, Policy, PolicySet, Resource as DRResource, ResourceRules,
         ResourceTarget,
     };
     use uuid::Uuid;
@@ -137,6 +136,8 @@ mod tests {
                 chrono::Utc::now(),
                 "company",
                 &DelegationRequest {
+                    delegation_path: None,
+                    previous_steps: None,
                     policy_issuer: "another-company".to_owned(),
                     target: DelegationTarget {
                         access_subject: "company".to_owned()
@@ -158,6 +159,8 @@ mod tests {
                 chrono::Utc::now(),
                 "company",
                 &DelegationRequest {
+                    delegation_path: None,
+                    previous_steps: None,
                     policy_issuer: "company".to_owned(),
                     target: DelegationTarget {
                         access_subject: "another-company".to_owned()
@@ -179,6 +182,8 @@ mod tests {
                 chrono::Utc::now(),
                 "another-company",
                 &DelegationRequest {
+                    delegation_path: None,
+                    previous_steps: None,
                     policy_issuer: "company".to_owned(),
                     target: DelegationTarget {
                         access_subject: "difference-company".to_owned()
@@ -200,6 +205,8 @@ mod tests {
                 chrono::Utc::now(),
                 "another-company",
                 &DelegationRequest {
+                    delegation_path: None,
+                    previous_steps: None,
                     policy_issuer: "company".to_owned(),
                     target: DelegationTarget {
                         access_subject: "difference-company".to_owned()
@@ -207,14 +214,14 @@ mod tests {
                     policy_sets: vec![PolicySet {
                         policies: vec![Policy {
                             target: ResourceTarget {
-                                resource: ishare::delegation_request::Resource {
+                                resource: ishare::v3::delegation_request::Resource {
                                     resource_type: "".to_owned(),
                                     identifiers: vec![],
                                     attributes: vec![],
                                 },
                                 actions: vec![],
-                                environment: Some(Environment {
-                                    service_providers: vec!["cool-company".to_owned()]
+                                context: Some(Context {
+                                    service_provider: Some("cool-company".to_owned()),
                                 }),
                             },
                             rules: vec![],
@@ -236,6 +243,8 @@ mod tests {
                 chrono::Utc::now(),
                 "another-company",
                 &DelegationRequest {
+                    delegation_path: None,
+                    previous_steps: None,
                     policy_issuer: "company".to_owned(),
                     target: DelegationTarget {
                         access_subject: "difference-company".to_owned()
@@ -243,14 +252,14 @@ mod tests {
                     policy_sets: vec![PolicySet {
                         policies: vec![Policy {
                             target: ResourceTarget {
-                                resource: ishare::delegation_request::Resource {
+                                resource: ishare::v3::delegation_request::Resource {
                                     resource_type: "".to_owned(),
                                     identifiers: vec![],
                                     attributes: vec![],
                                 },
                                 actions: vec![],
-                                environment: Some(Environment {
-                                    service_providers: vec!["another-company".to_owned()]
+                                context: Some(Context {
+                                    service_provider: Some("another-company".to_owned()),
                                 }),
                             },
                             rules: vec![],
@@ -313,8 +322,8 @@ mod tests {
                         identifiers: vec!["chicken".to_owned()],
                         attributes: vec!["chicken".to_owned()],
                     },
-                    environment: Some(Environment {
-                        service_providers: vec!["fishery".to_owned()],
+                    context: Some(Context {
+                        service_provider: Some("fishery".to_owned()),
                     }),
                 },
                 rules: vec![ResourceRules {
@@ -346,8 +355,8 @@ mod tests {
                         identifiers: vec!["id1".to_owned()],
                         attributes: vec!["att1".to_owned()],
                     },
-                    environment: Some(Environment {
-                        service_providers: vec!["fishery".to_owned()],
+                    context: Some(Context {
+                        service_provider: Some("fishery".to_owned()),
                     }),
                 },
                 rules: vec![ResourceRules {
@@ -379,8 +388,8 @@ mod tests {
                         identifiers: vec!["chicken".to_owned()],
                         attributes: vec!["chicken".to_owned()],
                     },
-                    environment: Some(Environment {
-                        service_providers: vec!["fishery".to_owned()],
+                    context: Some(Context {
+                        service_provider: Some("fishery".to_owned()),
                     }),
                 },
                 rules: vec![ResourceRules {
@@ -412,8 +421,8 @@ mod tests {
                         identifiers: vec!["chicken".to_owned()],
                         attributes: vec!["chicken".to_owned()],
                     },
-                    environment: Some(Environment {
-                        service_providers: vec!["fishery".to_owned()],
+                    context: Some(Context {
+                        service_provider: Some("fishery".to_owned()),
                     }),
                 },
                 rules: vec![ResourceRules {
@@ -445,8 +454,8 @@ mod tests {
                         identifiers: vec!["chicken".to_owned()],
                         attributes: vec!["chicken".to_owned()],
                     },
-                    environment: Some(Environment {
-                        service_providers: vec!["fishery".to_owned()],
+                    context: Some(Context {
+                        service_provider: Some("fishery".to_owned()),
                     }),
                 },
                 rules: vec![ResourceRules {
@@ -478,8 +487,8 @@ mod tests {
                         identifiers: vec!["chicken".to_owned()],
                         attributes: vec!["chicken".to_owned()],
                     },
-                    environment: Some(Environment {
-                        service_providers: vec!["another-fishery".to_owned()],
+                    context: Some(Context {
+                        service_provider: Some("another-fishery".to_owned()),
                     }),
                 },
                 rules: vec![ResourceRules {
@@ -529,8 +538,8 @@ mod tests {
                             identifiers: vec!["fish".to_owned()],
                             attributes: vec!["chicken".to_owned()],
                         },
-                        environment: Some(Environment {
-                            service_providers: vec!["fishery".to_owned()],
+                        context: Some(Context {
+                            service_provider: Some("fishery".to_owned()),
                         }),
                     },
                     rules: vec![ResourceRules {
@@ -573,8 +582,8 @@ mod tests {
                             identifiers: vec!["fish".to_owned()],
                             attributes: vec!["chicken".to_owned()],
                         },
-                        environment: Some(Environment {
-                            service_providers: vec!["fishery".to_owned()],
+                        context: Some(Context {
+                            service_provider: Some("fishery".to_owned()),
                         }),
                     },
                     rules: vec![ResourceRules {
@@ -616,8 +625,8 @@ mod tests {
                         identifiers: vec!["chicken".to_owned()],
                         attributes: vec!["chicken".to_owned()],
                     },
-                    environment: Some(Environment {
-                        service_providers: vec!["fishery".to_owned()],
+                    context: Some(Context {
+                        service_provider: Some("fishery".to_owned()),
                     }),
                 },
                 rules: vec![ResourceRules {
@@ -667,8 +676,8 @@ mod tests {
                         identifiers: vec!["chicken".to_owned()],
                         attributes: vec!["chicken".to_owned()],
                     },
-                    environment: Some(Environment {
-                        service_providers: vec!["fishery".to_owned()],
+                    context: Some(Context {
+                        service_provider: Some("fishery".to_owned()),
                     }),
                 },
                 rules: vec![ResourceRules {
@@ -702,6 +711,8 @@ mod tests {
 
         let policy_sets = get_delegation_evidence_policy_sets(
             &DelegationRequest {
+                delegation_path: None,
+                previous_steps: None,
                 policy_issuer: "ps".to_owned(),
                 target: DelegationTarget {
                     access_subject: "as".to_owned(),
@@ -715,8 +726,8 @@ mod tests {
                                 identifiers: vec!["chicken".to_owned()],
                                 attributes: vec!["chicken".to_owned()],
                             },
-                            environment: Some(Environment {
-                                service_providers: vec!["fishery".to_owned()],
+                            context: Some(Context {
+                                service_provider: Some("fishery".to_owned()),
                             }),
                         },
                         rules: vec![ResourceRules {
@@ -777,6 +788,8 @@ mod tests {
 
         let policy_sets = get_delegation_evidence_policy_sets(
             &DelegationRequest {
+                delegation_path: None,
+                previous_steps: None,
                 policy_issuer: "ps".to_owned(),
                 target: DelegationTarget {
                     access_subject: "as".to_owned(),
@@ -790,8 +803,8 @@ mod tests {
                                 identifiers: vec!["chicken".to_owned()],
                                 attributes: vec!["chicken".to_owned()],
                             },
-                            environment: Some(Environment {
-                                service_providers: vec!["fishery".to_owned()],
+                            context: Some(Context {
+                                service_provider: Some("fishery".to_owned()),
                             }),
                         },
                         rules: vec![ResourceRules {
@@ -858,6 +871,8 @@ mod tests {
 
         let policy_sets = get_delegation_evidence_policy_sets(
             &DelegationRequest {
+                delegation_path: None,
+                previous_steps: None,
                 policy_issuer: "ps".to_owned(),
                 target: DelegationTarget {
                     access_subject: "as".to_owned(),
@@ -872,8 +887,8 @@ mod tests {
                                     identifiers: vec!["chicken".to_owned()],
                                     attributes: vec!["chicken".to_owned()],
                                 },
-                                environment: Some(Environment {
-                                    service_providers: vec!["fishery".to_owned()],
+                                context: Some(Context {
+                                    service_provider: Some("fishery".to_owned()),
                                 }),
                             },
                             rules: vec![ResourceRules {
@@ -890,8 +905,8 @@ mod tests {
                                     identifiers: vec!["chicken".to_owned()],
                                     attributes: vec!["chicken".to_owned()],
                                 },
-                                environment: Some(Environment {
-                                    service_providers: vec!["fishery".to_owned()],
+                                context: Some(Context {
+                                    service_provider: Some("fishery".to_owned()),
                                 }),
                             },
                             rules: vec![ResourceRules {

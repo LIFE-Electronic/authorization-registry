@@ -3,8 +3,8 @@ pub mod helpers {
     use ar_migration::{Migrator, MigratorTrait};
     use axum::body::Body;
     use axum::{async_trait, Router};
-    use ishare::delegation_evidence::DelegationEvidenceContainer;
-    use ishare::ishare::{Adherence, Capabilities, PartyInfo, ValidatePartyError};
+    use ishare::v3::delegation_evidence::DelegationEvidenceContainer;
+    use ishare::v3::{Capabilities, Party, ValidatePartyError};
     use sea_orm::{Database, DatabaseConnection};
     use serde_json::Value;
     use sqlx::{postgres::PgConnectOptions, ConnectOptions};
@@ -161,17 +161,12 @@ pub mod helpers {
             &self,
             _now: chrono::DateTime<chrono::Utc>,
             eori: &str,
-        ) -> Result<PartyInfo, ValidatePartyError> {
-            return Ok(PartyInfo {
-                capability_url: "capabilities".to_owned(),
-                adherence: Adherence {
-                    status: "Active".to_string(),
-                    end_date: "2026-03-25T00:00:00.000Z".to_string(),
-                },
-                party_id: eori.to_string(),
-                party_name: "cool party".to_string(),
-                certificates_or_spor: ishare::ishare::CertificatesOrSpor::Certificates(vec![]),
-                agreements: vec![],
+        ) -> Result<Party, ValidatePartyError> {
+            return Ok(Party {
+                id: eori.to_string(),
+                name: "cool party".to_string(),
+                also_known_as: None,
+                claims: vec![],
             });
         }
 

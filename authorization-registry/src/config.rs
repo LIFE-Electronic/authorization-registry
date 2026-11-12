@@ -1,4 +1,4 @@
-use ishare::ishare::AllowedDataspaces;
+use ishare::AllowedDataspaces;
 use serde::{Deserialize, Serialize};
 
 fn default_listen_address() -> String {
