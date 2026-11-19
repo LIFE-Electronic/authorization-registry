@@ -4,9 +4,9 @@ use sea_orm::DatabaseConnection;
 use serde::{Deserialize, Serialize};
 
 use axum::async_trait;
-use ishare::{
-    delegation_evidence::DelegationEvidenceContainer,
-    ishare::{Capabilities, CertificatesOrSpor, PartyInfo, ValidatePartyError, ISHARE},
+use ishare::v3::{
+    delegation_evidence::DelegationEvidenceContainer, Capabilities, ParticipantRegistry, Party,
+    ValidatePartyError,
 };
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -84,7 +84,7 @@ pub trait SatelliteProvider: Send + Sync {
         &self,
         now: chrono::DateTime<chrono::Utc>,
         eori: &str,
-    ) -> Result<PartyInfo, ValidatePartyError>;
+    ) -> Result<Party, ValidatePartyError>;
 
     fn create_delegation_token(
         &self,
@@ -110,7 +110,7 @@ pub trait SatelliteProvider: Send + Sync {
 
 #[derive(Clone)]
 pub struct ISHAREProvider {
-    ishare: Arc<ISHARE>,
+    ishare: Arc<ParticipantRegistry>,
     db: DatabaseConnection,
     idp_connector: IdpConnector,
     satellite_token_cache: Arc<RwLock<TokenCache>>,
@@ -118,7 +118,7 @@ pub struct ISHAREProvider {
 
 impl ISHAREProvider {
     pub fn new(
-        ishare: Arc<ISHARE>,
+        ishare: Arc<ParticipantRegistry>,
         db: &DatabaseConnection,
         idp_connector: &IdpConnector,
     ) -> ISHAREProvider {
@@ -139,6 +139,7 @@ impl SatelliteProvider for ISHAREProvider {
         de_container: &DelegationEvidenceContainer,
     ) -> anyhow::Result<String> {
         self.ishare
+            .identity()
             .create_client_assertion_with_extra_claims(audience.to_owned(), de_container)
             .context("Error creating delegation token")
     }
@@ -149,6 +150,7 @@ impl SatelliteProvider for ISHAREProvider {
         capabilities: &Capabilities,
     ) -> anyhow::Result<String> {
         self.ishare
+            .identity()
             .create_client_assertion_with_extra_claims(audience.to_string(), capabilities)
             .context("Error creating delegation token")
     }
@@ -162,10 +164,11 @@ impl SatelliteProvider for ISHAREProvider {
 
             let client_assertion = self
                 .ishare
-                .create_client_assertion(self.ishare.satellite_eori.clone())?;
+                .identity()
+                .create_client_assertion(self.ishare.eori().to_owned())?;
             let token_response = self
                 .ishare
-                .get_satelite_access_token(&client_assertion)
+                .get_satellite_access_token(&client_assertion)
                 .await
                 .context("Error retrieving satelite access token")?;
 
@@ -185,7 +188,7 @@ impl SatelliteProvider for ISHAREProvider {
         &self,
         now: chrono::DateTime<chrono::Utc>,
         eori: &str,
-    ) -> Result<PartyInfo, ValidatePartyError> {
+    ) -> Result<Party, ValidatePartyError> {
         let token = self
             .get_satellite_token()
             .await
@@ -213,6 +216,7 @@ impl SatelliteProvider for ISHAREProvider {
             .get_auth_request_claims(server_url, redirect_url);
         let client_assertion = self
             .ishare
+            .identity()
             .create_client_assertion_with_extra_claims(
                 self.idp_connector.idp_eori.clone(),
                 auth_claims,
@@ -251,22 +255,20 @@ impl SatelliteProvider for ISHAREProvider {
             .await
             .context("Error getting party info IDP")?;
 
-        let idp_cert = match idp_info.certificates_or_spor {
-            CertificatesOrSpor::Spor(_) => {
-                anyhow::bail!("Error: IDP should have certificate instead of spor");
-            }
-            CertificatesOrSpor::Certificates(certificates) => certificates
-                .into_iter()
-                .next()
-                .context("No certificate found for IDP")?,
-        };
+        let idp_cert = idp_info
+            .claims
+            .iter()
+            .filter(|claim| claim.claim_type == "x509Certificate")
+            .find_map(|claim| claim.attribute("x5c"))
+            .context("No certificate found for IDP")?;
 
         let encrypted_client_assertion = self
             .ishare
+            .identity()
             .create_client_assertion_with_extra_claims_encrypted(
                 self.idp_connector.idp_eori.clone(),
                 auth_claims,
-                &idp_cert,
+                idp_cert,
             )
             .context("Error creating encyrpted client assertion")?;
 
@@ -289,7 +291,7 @@ impl SatelliteProvider for ISHAREProvider {
         policy_issuer: &str,
         access_subject: &str,
     ) -> bool {
-        let policy_issuer_access = match self.ishare.decode_token(
+        let policy_issuer_access = match self.ishare.identity().decode_token(
             now,
             client_assertion,
             policy_issuer,
@@ -305,7 +307,7 @@ impl SatelliteProvider for ISHAREProvider {
             }
         };
 
-        let access_subject_access = match self.ishare.decode_token(
+        let access_subject_access = match self.ishare.identity().decode_token(
             now,
             client_assertion,
             access_subject,
@@ -331,6 +333,7 @@ impl SatelliteProvider for ISHAREProvider {
     ) -> Result<(String, UserOption), AppError> {
         let client_assertion = self
             .ishare
+            .identity()
             .create_client_assertion(self.idp_connector.idp_eori.clone())
             .context("Error creating client assertion")?;
 
@@ -342,6 +345,7 @@ impl SatelliteProvider for ISHAREProvider {
 
         let decoded_id_token = self
             .ishare
+            .identity()
             .decode_token_custom_claims::<IdTokenClaims>(&response.id_token, None)
             .context("Error decoding id_token")?;
 
@@ -395,7 +399,7 @@ impl SatelliteProvider for ISHAREProvider {
             client_id
         );
 
-        match ishare::ishare::validate_request_arguments(grant_type, client_assertion_type, scope) {
+        match ishare::validate_request_arguments(grant_type, client_assertion_type, scope) {
             Err(message) => {
                 return Err(AppError::Expected(ExpectedError {
                     status_code: StatusCode::BAD_REQUEST,
@@ -409,9 +413,13 @@ impl SatelliteProvider for ISHAREProvider {
 
         match self
             .ishare
-            .validate_token(&client_assertion.to_string())
-            .context("Error validating client assertion")
-        {
+            .trust_anchor()
+            .context("Error dereferencing ishare_cert")
+            .and_then(|trust_anchor| {
+                trust_anchor
+                    .validate_token(&client_assertion.to_string())
+                    .context("Error validating client assertion")
+            }) {
             Ok(true) => {}
             Ok(false) => {
                 return Err(AppError::Expected(ExpectedError {
@@ -434,6 +442,7 @@ impl SatelliteProvider for ISHAREProvider {
         // probably need to be more explicit here in case the token has expired etc
         let client_assertion_token = self
             .ishare
+            .identity()
             .decode_token(now, &client_assertion, client_id, None)
             .map_err(|e| {
                 return AppError::Expected(ExpectedError {
@@ -471,7 +480,7 @@ impl SatelliteProvider for ISHAREProvider {
         }
 
         let company_id =
-            company_store::insert_if_not_exists(&client_id, &party_info.party_name, &self.db)
+            company_store::insert_if_not_exists(&client_id, &party_info.name, &self.db)
                 .await
                 .context("Error inserting company into db")?;
 

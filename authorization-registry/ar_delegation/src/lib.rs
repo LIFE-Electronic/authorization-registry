@@ -1,8 +1,8 @@
 use ar_entity::delegation_evidence::ResourceRule;
-use ishare::delegation_evidence::{
+use ishare::v3::delegation_evidence::{
     PolicySetTarget, PolicySetTargetEnvironment, Resource, ResourceRules, ResourceTarget,
 };
-use ishare::delegation_request::{DelegationRequest, Policy, PolicySet};
+use ishare::v3::delegation_request::{DelegationRequest, Policy, PolicySet};
 
 pub use ar_entity::delegation_evidence::{DelegationEvidencePolicy, MatchingPolicySetRow};
 
@@ -25,9 +25,12 @@ pub fn is_matching_policy(dr_policy: &Policy, de_policy_set: &DelegationEvidence
         &de_policy_set.attributes,
     ) && star_or_contained_by(&dr_policy.target.actions, &de_policy_set.actions)
         && dr_policy.target.resource.resource_type == de_policy_set.resource_type
-        && dr_policy.target.environment.as_ref().is_none_or(|e| {
-            is_contained_by(&e.service_providers, &de_policy_set.service_providers)
-        });
+        && dr_policy
+            .target
+            .context
+            .as_ref()
+            .and_then(|c| c.service_provider.as_ref())
+            .is_none_or(|sp| de_policy_set.service_providers.contains(sp));
 }
 
 pub fn mask_matching_policy_sets<'a>(
@@ -75,28 +78,22 @@ pub fn is_permit(policy: &Policy, matching_row: &MatchingPolicySetRow) -> bool {
 pub fn get_delegation_evidence_policy_sets(
     delegation_request: &DelegationRequest,
     matching_policy_sets: &Vec<MatchingPolicySetRow>,
-) -> Vec<ishare::delegation_evidence::PolicySet> {
+) -> Vec<ishare::v3::delegation_evidence::PolicySet> {
     let mut policy_sets = vec![];
     for ps in delegation_request.policy_sets.iter() {
         let matching_policy_sets = mask_matching_policy_sets(ps, &matching_policy_sets);
 
         if matching_policy_sets.len() > 0 {
             for matching in matching_policy_sets.into_iter() {
-                let policies: Vec<ishare::delegation_evidence::Policy> = ps
+                let policies: Vec<ishare::v3::delegation_evidence::Policy> = ps
                     .policies
                     .iter()
                     .map(|p| {
                         let permit = is_permit(p, matching);
 
-                        ishare::delegation_evidence::Policy {
+                        ishare::v3::delegation_evidence::Policy {
                             target: ResourceTarget {
                                 actions: p.target.actions.clone(),
-                                environment: match p.target.environment.as_ref() {
-                                    Some(e) => Some(ishare::delegation_evidence::Environment {
-                                        service_providers: e.service_providers.clone(),
-                                    }),
-                                    None => None,
-                                },
                                 resource: Resource {
                                     resource_type: p.target.resource.resource_type.clone(),
                                     identifiers: p.target.resource.identifiers.clone(),
@@ -114,7 +111,7 @@ pub fn get_delegation_evidence_policy_sets(
                     })
                     .collect();
 
-                let new_policy_set = ishare::delegation_evidence::PolicySet {
+                let new_policy_set = ishare::v3::delegation_evidence::PolicySet {
                     max_delegation_depth: matching.max_delegation_depth,
                     policies,
                     target: PolicySetTarget {
@@ -127,18 +124,12 @@ pub fn get_delegation_evidence_policy_sets(
                 policy_sets.push(new_policy_set);
             }
         } else {
-            let policies: Vec<ishare::delegation_evidence::Policy> = ps
+            let policies: Vec<ishare::v3::delegation_evidence::Policy> = ps
                 .policies
                 .iter()
-                .map(|p| ishare::delegation_evidence::Policy {
+                .map(|p| ishare::v3::delegation_evidence::Policy {
                     target: ResourceTarget {
                         actions: p.target.actions.clone(),
-                        environment: match p.target.environment.as_ref() {
-                            Some(e) => Some(ishare::delegation_evidence::Environment {
-                                service_providers: e.service_providers.clone(),
-                            }),
-                            None => None,
-                        },
                         resource: Resource {
                             resource_type: p.target.resource.resource_type.clone(),
                             identifiers: p.target.resource.identifiers.clone(),
@@ -151,7 +142,7 @@ pub fn get_delegation_evidence_policy_sets(
                 })
                 .collect();
 
-            let new_policy_set = ishare::delegation_evidence::PolicySet {
+            let new_policy_set = ishare::v3::delegation_evidence::PolicySet {
                 max_delegation_depth: 0,
                 policies,
                 target: PolicySetTarget {

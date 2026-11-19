@@ -26,8 +26,8 @@
 
 use std::sync::Mutex;
 
-use ishare::delegation_request::{
-    DelegationRequest, DelegationTarget, Environment, Policy, PolicySet, Resource, ResourceRules,
+use ishare::v3::delegation_request::{
+    Context, DelegationRequest, DelegationTarget, Policy, PolicySet, Resource, ResourceRules,
     ResourceTarget,
 };
 use uuid::Uuid;
@@ -182,9 +182,9 @@ impl TestAuthorizationRegistry {
     /// of their identifiers.
     ///
     /// `service_provider: Some(eori)` asks as that service provider (the way
-    /// the ishare PDP client sends its own EORI as the request environment),
+    /// the ishare PDP client sends its own EORI as the request context),
     /// so only rows naming that provider match — there is no wildcard for
-    /// service providers in the matching engine. `None` sends no environment
+    /// service providers in the matching engine. `None` sends no context
     /// and skips service-provider matching entirely.
     pub fn is_permitted(
         &self,
@@ -196,6 +196,8 @@ impl TestAuthorizationRegistry {
         service_provider: Option<&str>,
     ) -> bool {
         let request = DelegationRequest {
+            delegation_path: None,
+            previous_steps: None,
             policy_issuer: policy_issuer.to_owned(),
             target: DelegationTarget {
                 access_subject: access_subject.to_owned(),
@@ -209,8 +211,8 @@ impl TestAuthorizationRegistry {
                             attributes: vec!["*".to_owned()],
                         },
                         actions: vec![action.to_owned()],
-                        environment: service_provider.map(|sp| Environment {
-                            service_providers: vec![sp.to_owned()],
+                        context: service_provider.map(|sp| Context {
+                            service_provider: Some(sp.to_owned()),
                         }),
                     },
                     rules: vec![ResourceRules {
@@ -235,7 +237,7 @@ impl TestAuthorizationRegistry {
     pub fn evaluate(
         &self,
         request: &DelegationRequest,
-    ) -> Vec<ishare::delegation_evidence::PolicySet> {
+    ) -> Vec<ishare::v3::delegation_evidence::PolicySet> {
         let rows: Vec<MatchingPolicySetRow> = self
             .rows
             .lock()
@@ -394,7 +396,7 @@ mod tests {
             ids(&["file-1"]),
             Some("EU.EORI.NLOTHERSTATION")
         ));
-        // no environment: service-provider matching is skipped
+        // no context: service-provider matching is skipped
         assert!(ar.is_permitted(
             REQUESTER,
             OWNER,
@@ -416,7 +418,7 @@ mod tests {
         );
 
         // rows without service providers can never match a request that
-        // carries an environment -- there is no wildcard for service providers
+        // carries a context -- there is no wildcard for service providers
         assert!(!ar.is_permitted(
             REQUESTER,
             OWNER,

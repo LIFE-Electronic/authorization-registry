@@ -3,11 +3,11 @@ use std::{collections::HashMap, fmt, sync::Arc};
 use anyhow::Context;
 use ar_entity::audit_event::{ActiveModel as AuditEventModel, Entity as AuditEventEntity};
 use chrono::{DateTime, Utc};
-use ishare::{
+use ishare::v3::{
     delegation_evidence::verify_delegation_evidence,
     delegation_request::{
-        DelegationRequest, DelegationTarget, Environment, Policy, PolicySet, Resource,
-        ResourceRules, ResourceTarget,
+        Context as DelegationContext, DelegationRequest, DelegationTarget, Policy, PolicySet,
+        Resource, ResourceRules, ResourceTarget,
     },
 };
 use reqwest::StatusCode;
@@ -215,6 +215,8 @@ pub async fn retrieve_events(
 
     let delegation_evidence_container = create_delegation_evidence(
         &DelegationRequest {
+            delegation_path: None,
+            previous_steps: None,
             policy_issuer: app_config.client_eori.to_owned(),
             target: DelegationTarget {
                 access_subject: controller_eori.to_string(),
@@ -228,8 +230,8 @@ pub async fn retrieve_events(
                             attributes: vec!["*".to_owned()],
                         },
                         actions: vec!["Read".to_owned()],
-                        environment: Some(Environment {
-                            service_providers: vec![app_config.client_eori.to_string()],
+                        context: Some(DelegationContext {
+                            service_provider: Some(app_config.client_eori.to_string()),
                         }),
                     },
                     rules: vec![ResourceRules {

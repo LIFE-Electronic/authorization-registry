@@ -16,7 +16,7 @@ use crate::services::audit_log::log_event;
 use crate::services::delegation as delegation_service;
 use crate::services::server_token::{Role, ServerToken};
 use crate::AppState;
-use ishare::delegation_request::DelegationRequestContainer;
+use ishare::v3::delegation_request::DelegationRequestContainer;
 
 pub fn get_delegation_routes(server_token: std::sync::Arc<ServerToken>) -> Router<AppState> {
     Router::new()
@@ -25,6 +25,7 @@ pub fn get_delegation_routes(server_token: std::sync::Arc<ServerToken>) -> Route
 }
 
 #[derive(Deserialize, Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
 struct DelegationResponse {
     delegation_token: String,
 }
@@ -132,7 +133,7 @@ async fn post_delegation(
         now,
         &role.get_company_id(),
         &body.delegation_request,
-        &body.previous_steps,
+        &body.delegation_request.previous_steps,
         app_state.config.delegation_allows_service_providers,
         app_state.satellite_provider.clone(),
     ) {
@@ -207,7 +208,7 @@ mod test {
     use ar_entity::delegation_evidence::{
         Environment, Policy, Resource, ResourceRule, ResourceTarget,
     };
-    use ishare::delegation_evidence::DelegationEvidenceContainer;
+    use ishare::v3::delegation_evidence::DelegationEvidenceContainer;
 
     use crate::db::policy::AccessSubjectTarget;
     use crate::fixtures::fixtures::insert_policy_set_fixture;
@@ -254,8 +255,8 @@ mod test {
                                         "attributes": ["zingers"]
                                     },
                                     "actions": ["Read", "Delete"],
-                                    "environment": {
-                                        "serviceProviders": ["good-company"]
+                                    "context": {
+                                        "serviceProvider": "good-company"
                                     }
                                 },
                                 "rules": [
@@ -295,6 +296,73 @@ mod test {
     }
 
     #[sqlx::test]
+    async fn test_delegation_evidence_previous_steps(
+        _pool_options: PgPoolOptions,
+        conn_option: PgConnectOptions,
+    ) -> sqlx::Result<()> {
+        let db = init_test_db(&conn_option).await;
+        insert_policy_set_fixture("./fixtures/policy_set1.json", &db).await;
+
+        let app = get_test_app(db);
+        let request_body = create_request_body(&json!({
+            "delegationRequest": {
+                "policyIssuer": "NL.24244",
+                "target": {
+                    "accessSubject": "NL.44444"
+                },
+                "policySets": [
+                    {
+                        "policies": [
+                            {
+                                "target": {
+                                    "resource": {
+                                        "type": "TestResource",
+                                        "identifiers": ["test4"],
+                                        "attributes": ["zingers"]
+                                    },
+                                    "actions": ["Read", "Delete"],
+                                    "context": {
+                                        "serviceProvider": "good-company"
+                                    }
+                                },
+                                "rules": [
+                                    {
+                                        "effect": "Permit"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ],
+                "previousSteps": ["client-assertion"]
+            }
+        }));
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/delegation")
+                    .method("POST")
+                    .header(
+                        AUTHORIZATION,
+                        server_token::server_token_test_helper::get_human_token_header(
+                            Some("OtherCompany".to_owned()),
+                            None,
+                        ),
+                    )
+                    .header("Content-Type", "application/json")
+                    .header("Accept", "application/json")
+                    .body(Body::new(request_body))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+
+        Ok(())
+    }
+
+    #[sqlx::test]
     async fn test_delegation_evidence(
         _pool_options: PgPoolOptions,
         conn_option: PgConnectOptions,
@@ -320,8 +388,8 @@ mod test {
                                         "attributes": ["zingers"]
                                     },
                                     "actions": ["Read", "Delete"],
-                                    "environment": {
-                                        "serviceProviders": ["good-company"]
+                                    "context": {
+                                        "serviceProvider": "good-company"
                                     }
                                 },
                                 "rules": [
@@ -399,8 +467,8 @@ mod test {
                                         "attributes": ["zingers"]
                                     },
                                     "actions": ["Read", "Delete"],
-                                    "environment": {
-                                        "serviceProviders": ["good-company"]
+                                    "context": {
+                                        "serviceProvider": "good-company"
                                     }
                                 },
                                 "rules": [
@@ -435,6 +503,12 @@ mod test {
 
         assert_eq!(response.status(), StatusCode::OK);
 
+        let body: serde_json::Value =
+            serde_json::from_slice(&response.into_body().collect().await.unwrap().to_bytes())
+                .unwrap();
+
+        assert_eq!(body, json!({ "delegationToken": "delegation token" }));
+
         Ok(())
     }
 
@@ -464,8 +538,8 @@ mod test {
                                         "attributes": ["zingers"]
                                     },
                                     "actions": ["Read", "Delete"],
-                                    "environment": {
-                                        "serviceProviders": ["good-company"]
+                                    "context": {
+                                        "serviceProvider": "good-company"
                                     }
                                 },
                                 "rules": [
@@ -543,8 +617,8 @@ mod test {
                                         "attributes": ["zingers"]
                                     },
                                     "actions": ["Read", "Delete", "Fish"],
-                                    "environment": {
-                                        "serviceProviders": ["good-company"]
+                                    "context": {
+                                        "serviceProvider": "good-company"
                                     }
                                 },
                                 "rules": [
@@ -631,8 +705,8 @@ mod test {
                                         "attributes": ["zingers"]
                                     },
                                     "actions": ["Read", "Delete"],
-                                    "environment": {
-                                        "serviceProviders": ["good-company"]
+                                    "context": {
+                                        "serviceProvider": "good-company"
                                     }
                                 },
                                 "rules": [
@@ -710,8 +784,8 @@ mod test {
                                         "attributes": ["zingers"]
                                     },
                                     "actions": ["Read", "Delete"],
-                                    "environment": {
-                                        "serviceProviders": ["good-company"]
+                                    "context": {
+                                        "serviceProvider": "good-company"
                                     }
                                 },
                                 "rules": [
@@ -809,8 +883,8 @@ mod test {
                                         "attributes": ["*"]
                                     },
                                     "actions": ["Read"],
-                                    "environment": {
-                                        "serviceProviders": ["service"]
+                                    "context": {
+                                        "serviceProvider": "service"
                                     }
                                 },
                                 "rules": [
@@ -890,8 +964,8 @@ mod test {
                                         "attributes": ["zingers"]
                                     },
                                     "actions": ["Read", "Delete"],
-                                    "environment": {
-                                        "serviceProviders": ["good-company"]
+                                    "context": {
+                                        "serviceProvider": "good-company"
                                     }
                                 },
                                 "rules": [
@@ -953,8 +1027,8 @@ mod test {
                                         "attributes": []
                                     },
                                     "actions": ["Read", "Delete"],
-                                    "environment": {
-                                        "serviceProviders": ["good-company"]
+                                    "context": {
+                                        "serviceProvider": "good-company"
                                     }
                                 },
                                 "rules": [
@@ -1016,8 +1090,8 @@ mod test {
                                         "attributes": ["zingers"]
                                     },
                                     "actions": ["Read", "Delete"],
-                                    "environment": {
-                                        "serviceProviders": ["good-company"]
+                                    "context": {
+                                        "serviceProvider": "good-company"
                                     }
                                 },
                                 "rules": [

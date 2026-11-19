@@ -9,7 +9,7 @@ use axum::async_trait;
 use axum::Extension;
 use axum::{extract::FromRef, Router};
 use clap::Parser;
-use ishare::ishare::ISHARE;
+use ishare::{v3::ParticipantRegistry, Identity, TrustAnchor};
 use routes::admin::get_admin_routes;
 use routes::capabilities::get_capabilities_routes;
 use routes::connect::get_connect_routes;
@@ -216,18 +216,18 @@ async fn main() {
     apply_seeds(&db, &config).await;
 
     let server_token = ServerToken::new(config.jwt_secret, config.jwt_expiry_seconds);
-    let ishare = Arc::new(
-        ISHARE::new(
-            config.client_cert_path,
-            config.client_cert_pass,
-            config.satellite_url,
-            Some(config.ishare_ca_path),
-            config.client_eori.clone(),
-            config.satellite_eori,
-            config.dataspace_config.clone(),
+    let ishare = Arc::new(ParticipantRegistry::new(
+        Identity::from_p12(
+            &config.client_cert_path,
+            &config.client_cert_pass,
+            &config.client_eori,
         )
         .unwrap(),
-    );
+        Some(TrustAnchor::from_pem_file(&config.ishare_ca_path).unwrap()),
+        config.satellite_url,
+        config.satellite_eori,
+        config.dataspace_config.clone(),
+    ));
     let idp_connector =
         IdpConnector::new(config.idp_url, config.client_eori.clone(), config.idp_eori);
     let sat_provider = ISHAREProvider::new(ishare.clone(), &db, &idp_connector);
